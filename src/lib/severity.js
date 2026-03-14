@@ -1,16 +1,16 @@
 /**
  * Severity → color/label mapping.
- * Severity palette: green (mild) / amber (moderate) / red (severe) / deep red (emergency) / gray (none).
+ * Coral spectrum: warm peach (low) → coral (high)
  */
 
 const LEVELS = [
-  { min: 1, max: 3, label: "mild", color: "#22c55e", tw: "bg-severity-mild" },
-  { min: 4, max: 6, label: "moderate", color: "#f59e0b", tw: "bg-severity-moderate" },
-  { min: 7, max: 9, label: "severe", color: "#ef4444", tw: "bg-severity-severe" },
-  { min: 10, max: 10, label: "emergency", color: "#b91c1c", tw: "bg-severity-emergency" },
+  { min: 1, max: 3, label: "mild", color: "#FBC4AB" },
+  { min: 4, max: 6, label: "moderate", color: "#F4978E" },
+  { min: 7, max: 9, label: "severe", color: "#F08080" },
+  { min: 10, max: 10, label: "emergency", color: "#D45D5D" },
 ];
 
-const NONE = { label: "none", color: "#d1d5db", tw: "bg-severity-none" };
+const NONE = { label: "none", color: "#F0E0E0" };
 
 function getLevel(n) {
   if (n == null || n === 0) return NONE;
@@ -21,28 +21,31 @@ export function severityColor(n) {
   return getLevel(n).color;
 }
 
-export function severityTwClass(n) {
-  return getLevel(n).tw;
-}
-
 export function severityLabel(n) {
   return getLevel(n).label;
 }
 
 /**
- * The 4 severity options for the SeverityPicker component.
- * Each maps a user-friendly label to a numeric value.
+ * Mankoski Pain Scale (0-10)
  */
-export const SEVERITY_OPTIONS = [
-  { label: "Mild", value: 3, color: "#22c55e", tw: "bg-severity-mild" },
-  { label: "Moderate", value: 5, color: "#f59e0b", tw: "bg-severity-moderate" },
-  { label: "Severe", value: 8, color: "#ef4444", tw: "bg-severity-severe" },
-  { label: "Emergency", value: 10, color: "#b91c1c", tw: "bg-severity-emergency" },
+export const MANKOSKI_SCALE = [
+  { value: 0, label: "Pain free" },
+  { value: 1, label: "Very minor annoyance" },
+  { value: 2, label: "Minor annoyance, occasional twinges" },
+  { value: 3, label: "Annoying, distracting" },
+  { value: 4, label: "Can be ignored if focused" },
+  { value: 5, label: "Can't ignore for more than 30 min" },
+  { value: 6, label: "Can't ignore, but can work" },
+  { value: 7, label: "Hard to concentrate, affects sleep" },
+  { value: 8, label: "Physical activity severely limited" },
+  { value: 9, label: "Unable to speak, crying out" },
+  { value: 10, label: "Unconscious" },
 ];
+
+export const SEVERITY_OPTIONS = MANKOSKI_SCALE;
 
 /**
  * Build the text blob that gets uploaded to Moorcheh.
- * User's raw words with date/severity/cycleDay context prepended.
  */
 export function buildMoorchehText(rawText, severity, cycleDay, followUp) {
   const date = new Date().toISOString().split("T")[0];

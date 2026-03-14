@@ -57,30 +57,53 @@ export async function setOnboardingDone() {
   await AsyncStorage.setItem(KEYS.ONBOARDING_DONE, "true");
 }
 
-// --- API keys (encrypted via SecureStore) ---
+// --- API keys (encrypted via SecureStore on native, AsyncStorage on web) ---
+
+import { Platform } from "react-native";
+
+const isWeb = Platform.OS === "web";
 
 export async function getMoorchehKey() {
+  if (isWeb) {
+    return AsyncStorage.getItem("flare_moorcheh_key");
+  }
   return SecureStore.getItemAsync("flare_moorcheh_key");
 }
 
 export async function setMoorchehKey(key) {
-  await SecureStore.setItemAsync("flare_moorcheh_key", key);
+  if (isWeb) {
+    await AsyncStorage.setItem("flare_moorcheh_key", key);
+  } else {
+    await SecureStore.setItemAsync("flare_moorcheh_key", key);
+  }
 }
 
 export async function getWorkerUrl() {
+  if (isWeb) {
+    return AsyncStorage.getItem("flare_worker_url");
+  }
   return SecureStore.getItemAsync("flare_worker_url");
 }
 
 export async function setWorkerUrl(url) {
-  await SecureStore.setItemAsync("flare_worker_url", url);
+  if (isWeb) {
+    await AsyncStorage.setItem("flare_worker_url", url);
+  } else {
+    await SecureStore.setItemAsync("flare_worker_url", url);
+  }
 }
 
 // --- Housekeeping ---
 
 export async function clearAllData() {
   await AsyncStorage.multiRemove(Object.values(KEYS));
-  await SecureStore.deleteItemAsync("flare_moorcheh_key");
-  await SecureStore.deleteItemAsync("flare_worker_url");
+  if (isWeb) {
+    await AsyncStorage.removeItem("flare_moorcheh_key");
+    await AsyncStorage.removeItem("flare_worker_url");
+  } else {
+    await SecureStore.deleteItemAsync("flare_moorcheh_key");
+    await SecureStore.deleteItemAsync("flare_worker_url");
+  }
 }
 
 export async function exportData() {

@@ -1,6 +1,6 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { Home, PenLine, ClipboardList, Settings } from "lucide-react-native";
+import { Home, PenLine, ClipboardList } from "lucide-react-native";
 
 import HomeScreen from "../screens/HomeScreen";
 import JournalScreen from "../screens/JournalScreen";
@@ -17,7 +17,7 @@ function HomeStackScreen() {
       <HomeStack.Screen
         name="Settings"
         component={SettingsScreen}
-        options={{ headerShown: true, title: "Settings" }}
+        options={{ headerShown: false }}
       />
     </HomeStack.Navigator>
   );
@@ -36,13 +36,23 @@ export default function TabNavigator() {
         headerShown: false,
         tabBarIcon: ({ color, size }) => {
           const Icon = TAB_ICONS[route.name];
-          return <Icon size={size} color={color} />;
+          return <Icon size={20} color={color} strokeWidth={1.5} />;
         },
-        tabBarActiveTintColor: "#111827",
-        tabBarInactiveTintColor: "#9ca3af",
+        tabBarActiveTintColor: "#2D1520",
+        tabBarInactiveTintColor: "#A8969F",
         tabBarStyle: {
-          backgroundColor: "#ffffff",
-          borderTopColor: "#e5e7eb",
+          backgroundColor: "#FFF8F6",
+          borderTopColor: "#F0E0E0",
+          borderTopWidth: 0.5,
+          elevation: 0,
+          shadowOpacity: 0,
+          paddingTop: 6,
+          height: 56,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: "500",
+          letterSpacing: 0.3,
         },
       })}
     >
@@ -55,7 +65,7 @@ export default function TabNavigator() {
       <Tab.Screen
         name="Prep"
         component={PrepScreen}
-        options={{ tabBarLabel: "Appointment" }}
+        options={{ tabBarLabel: "Prep" }}
       />
     </Tab.Navigator>
   );
