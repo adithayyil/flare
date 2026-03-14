@@ -1,0 +1,106 @@
+// Moorcheh API wrapper.
+// All Moorcheh calls go through this module — the rest of the app never touches the API directly.
+//
+// In production this key MUST move to a backend proxy — never expose client-side.
+// This is where the Moorcheh boilerplate workshop code plugs in.
+// The boilerplate provides the namespace setup and API key configuration.
+
+const MOORCHEH_BASE = "https://api.moorcheh.ai/v1";
+const NAMESPACE = "flare-health-entries";
+
+function getApiKey() {
+  // For hackathon: read from a module-level variable set at app startup.
+  // In production: this call would go through a backend proxy instead.
+  return _apiKey;
+}
+
+let _apiKey = null;
+
+export function initMoorcheh(apiKey) {
+  _apiKey = apiKey;
+}
+
+async function moorchehFetch(path, body) {
+  const key = getApiKey();
+  if (!key) throw new Error("Moorcheh API key not configured");
+
+  const res = await fetch(`${MOORCHEH_BASE}${path}`, {
+    method: "POST",
+    headers: {
+      "x-api-key": key,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "Unknown error");
+    throw new Error(`Moorcheh ${res.status}: ${text}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * Upload a symptom entry to Moorcheh for semantic retrieval.
+ * @param {string} text - Human-readable entry text (user's words with date/severity context)
+ * @param {object} metadata - Flat key-value metadata: { timestamp, severity, cycleDay }
+ * @returns {{ uploadId: string }}
+ *
+ * Note: Processing is async (1-5s). Entry is available for search after processing completes.
+ */
+export async function uploadEntry(text, metadata) {
+  const id = `e_${Date.now()}`;
+  const result = await moorchehFetch(
+    `/namespaces/${NAMESPACE}/documents`,
+    {
+      documents: [{ id, text, ...metadata }],
+    }
+  );
+  return { uploadId: result.upload_id, id };
+}
+
+/**
+ * Semantic search over symptom entries.
+ * @param {string} naturalLanguageQuery - e.g. "severe pain that caused missed work"
+ * @param {number} topK - Max results to return (default 20)
+ * @returns {Array<{ id, score, text, metadata }>}
+ */
+export async function queryEntries(naturalLanguageQuery, topK = 20) {
+  const result = await moorchehFetch("/search", {
+    query: naturalLanguageQuery,
+    namespaces: [NAMESPACE],
+    top_k: topK,
+  });
+  return result.results || [];
+}
+
+/**
+ * Ask Moorcheh to answer a question using RAG over all entries.
+ * Moorcheh retrieves relevant entries, assembles context, and generates an answer.
+ * @param {string} question - The question to answer
+ * @param {string} [headerPrompt] - Custom system instruction for the RAG model
+ * @returns {string} The generated answer
+ */
+export async function answerFromEntries(question, headerPrompt) {
+  const result = await moorchehFetch("/answer", {
+    query: question,
+    namespace: NAMESPACE,
+    top_k: 30,
+    temperature: 0.3,
+    headerPrompt:
+      headerPrompt ||
+      "You are summarizing a patient's symptom log. Be factual and clinical. Do not diagnose.",
+    footerPrompt:
+      "Include dates, severity scores, and functional impact details.",
+  });
+  return result.answer;
+}
+
+/**
+ * Broad query to retrieve all entries. For exhaustive reads (e.g. export).
+ * For UI rendering (dot matrix, cycle stats), use the local index in AsyncStorage instead.
+ */
+export async function getAllEntries(topK = 100) {
+  return queryEntries("pelvic pain symptom entry log", topK);
+}
