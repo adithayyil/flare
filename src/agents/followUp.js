@@ -1,100 +1,51 @@
 /**
  * Agent 1: Follow-up Question Generator
- * Asks about functional impact - how pain affected daily life
+ * Calls the LLM to generate a contextual follow-up question
+ * about functional impact based on the user's symptom text and severity.
  */
+
+import { callAgent } from './client';
+
+const SYSTEM_PROMPT = `You are a follow-up question generator for a pelvic pain tracking app used by Canadian women. Given a symptom log entry and its severity (0-10), generate ONE short follow-up question that asks about functional impact — how the pain affected the person's daily life, activities, or ability to function.
+
+Rules:
+- The question must be empathetic and conversational, not clinical
+- Focus on functional impact: what they couldn't do, how they coped, what was disrupted
+- Tailor the question to what they actually described — don't ask generic questions
+- For high severity (7+): ask about missed activities, inability to function
+- For moderate severity (4-6): ask about coping strategies, partial disruption
+- For low severity (1-3): ask about whether it was noticeable or affected mood
+- Provide 4 short answer options relevant to the question (each under 8 words)
+
+Return ONLY this JSON (no markdown, no extra text):
+{"question": "your question here", "options": ["option1", "option2", "option3", "option4"]}`;
 
 /**
- * Generate a follow-up question about functional impact
+ * Generate a follow-up question about functional impact via LLM.
  * @param {string} symptomText - User's symptom description
  * @param {number} severity - Severity level (0-10)
- * @returns {Promise<{success: boolean, question?: string, options?: array, error?: string}>}
+ * @returns {Promise<{success: boolean, question?: string, options?: string[], error?: string}>}
  */
 export async function generateFollowUp(symptomText, severity) {
-  console.log('[FollowUp] Analyzing entry:', symptomText);
+  try {
+    const userMessage = `Severity: ${severity}/10\nEntry: ${symptomText}`;
 
-  const text = symptomText.toLowerCase();
+    const result = await callAgent(SYSTEM_PROMPT, userMessage, {
+      maxTokens: 512,
+      temperature: 0.7,
+    });
 
-  // Detect what they mentioned and ask about the impact
+    if (result.question && Array.isArray(result.options) && result.options.length > 0) {
+      return {
+        success: true,
+        question: result.question,
+        options: result.options.slice(0, 4),
+      };
+    }
 
-  // Mentioned missing work/class
-  if (/miss|couldn't|skipped|absent/.test(text) && /class|work|school|job/.test(text)) {
-    return {
-      success: true,
-      question: 'Did missing class affect any plans or commitments?',
-      options: [
-        'Missed work or class',
-        'Cancelled plans with people',
-        'Stayed in bed most of the day',
-        'Managed okay despite pain',
-      ],
-    };
+    return { success: false, error: 'Invalid LLM response shape' };
+  } catch (error) {
+    console.warn('[FollowUp] LLM call failed, skipping:', error.message);
+    return { success: false, error: error.message };
   }
-
-  // Mentioned staying home/bed
-  if (/stayed|bed|home|rest|lay down/.test(text)) {
-    return {
-      success: true,
-      question: 'How much of your day was affected?',
-      options: [
-        'Whole day in bed',
-        'Most of the day',
-        'A few hours',
-        'Could still do some things',
-      ],
-    };
-  }
-
-  // Mentioned specific activities
-  if (/walk|move|stand|sit/.test(text)) {
-    return {
-      success: true,
-      question: 'What activities were difficult?',
-      options: [
-        'Walking or standing',
-        'Sitting comfortably',
-        'Exercise or movement',
-        'Daily tasks (cooking, cleaning)',
-      ],
-    };
-  }
-
-  // High severity (7+) but no impact mentioned
-  if (severity >= 7) {
-    return {
-      success: true,
-      question: 'Did this interfere with your day?',
-      options: [
-        'Missed work or class',
-        'Cancelled plans',
-        'Stayed home',
-        'Managed to push through',
-      ],
-    };
-  }
-
-  // Moderate severity (4-6) but no impact mentioned
-  if (severity >= 4) {
-    return {
-      success: true,
-      question: 'How did you manage?',
-      options: [
-        'Took pain medication',
-        'Used heat/ice',
-        'Rested when possible',
-        'Just pushed through it',
-      ],
-    };
-  }
-
-  // Default: ask about general impact
-  return {
-    success: true,
-    question: 'Did this affect what you could do today?',
-    options: [
-      'Yes, significantly',
-      'Somewhat',
-      'Not really',
-      'Managed fine',
-    ],
-  };
 }
