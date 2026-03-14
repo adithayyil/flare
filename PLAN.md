@@ -59,11 +59,11 @@ flare-health/
 │   │   ├── CycleDayBadge.jsx         # "Cycle Day 14" pill
 │   │   ├── CycleDotMatrix.jsx        # Colored dot grid per cycle
 │   │   ├── LogPromptCard.jsx         # "How are you feeling?" tappable card
+│   │   ├── SeverityPicker.jsx        # 4-button severity tap: mild / moderate / severe / emergency
 │   │   ├── AgentBubble.jsx           # Single message bubble from agent
 │   │   ├── QuickPickChips.jsx        # Tappable pill buttons for fast input
 │   │   ├── ChatInput.jsx             # TextInput + send button, keyboard-aware
 │   │   ├── ConfirmationCard.jsx      # Entry summary with confirm/edit
-│   │   ├── FallbackForm.jsx          # Manual entry (slider + checkboxes)
 │   │   ├── LoadingPulse.jsx          # Animated dots/pulse indicator
 │   │   ├── CycleSummaryStats.jsx     # Per-cycle stats table
 │   │   ├── PatternInsightCard.jsx    # "This pattern is worth discussing..."
@@ -73,11 +73,10 @@ flare-health/
 │   │
 │   ├── agents/
 │   │   ├── client.js                 # fetch wrapper → Cloudflare Worker
-│   │   ├── prompts.js                # All 4 system prompts as constants
-│   │   ├── intake.js                 # Agent 1: text → structured JSON
-│   │   ├── followUp.js              # Agent 2: structured → follow-up Q
-│   │   ├── patternAnalysis.js        # Agent 3: entries → patterns
-│   │   └── gpBrief.js               # Agent 4: entries → brief + scripts
+│   │   ├── prompts.js                # All 3 agent system prompts as constants
+│   │   ├── followUp.js              # Agent 1: raw text → follow-up Q or null
+│   │   ├── patternAnalysis.js        # Agent 2: retrieved entries → patterns
+│   │   └── gpBrief.js               # Agent 3: RAG summary + patterns → brief + scripts
 │   │
 │   ├── lib/
 │   │   ├── storage.js                # AsyncStorage: local entry index, period starts, onboarding
@@ -87,7 +86,7 @@ flare-health/
 │   │
 │   └── hooks/
 │       ├── useJournalFlow.js         # State machine for journal entry
-│       └── useAppointmentPrep.js     # Orchestrates Agent 3 → 4 pipeline
+│       └── useAppointmentPrep.js     # Orchestrates Moorcheh retrieval → Agent 2 → Agent 3
 │
 └── worker/
     ├── wrangler.toml                 # CF Worker config (name, routes, secrets)
@@ -142,23 +141,20 @@ Storage is split into two layers: **AsyncStorage** for lightweight local data (f
 
 Namespace: `flare-health-entries`
 
-Each symptom entry is uploaded as a Moorcheh document. The `text` field is a human-readable sentence (not raw JSON), because Moorcheh embeds it for semantic search — natural language retrieves better than structured data.
+Each symptom entry is uploaded as a Moorcheh document. The `text` field is the user's raw description with date/severity context prepended. Moorcheh embeds this text for semantic search — no structured extraction needed. Queries like "missed work" or "pain during sex" find the right entries by meaning.
 
 **Document shape (uploaded to Moorcheh):**
 ```json
 {
   "id": "e_1710000000000",
-  "text": "On cycle day 3 (2026-03-14), patient reported severe period cramps rated 8/10. Missed work — this is the second day of missed work this cycle. Symptoms: dysmenorrhea. Functional impact: couldn't go to work.",
+  "text": "On 2026-03-14 (cycle day 3), severity 8/10: Really bad cramps today, couldn't go to work. [Follow-up — How many days missed this cycle? This is the second day.]",
   "timestamp": "2026-03-14T09:30:00.000Z",
   "severity": 8,
-  "cycleDay": 3,
-  "symptoms": "dysmenorrhea",
-  "functionalImpact": "missed work",
-  "cycleNumber": 3
+  "cycleDay": 3
 }
 ```
 
-The flat metadata fields (`severity`, `cycleDay`, `symptoms`, `functionalImpact`, `cycleNumber`) are additional document fields that Moorcheh stores alongside the text. `symptoms` is a comma-separated string (Moorcheh metadata is flat key-value).
+The `text` field is built as: `"On ${date} (cycle day ${cycleDay}), severity ${n}/10: ${rawText}${followUp ? ` [Follow-up — ${followUp.question} ${followUp.response}]` : ''}"`. The user's own words are the core — context is prepended so the embedding captures timing and intensity. Metadata fields (`severity`, `cycleDay`) are flat document fields for potential filtered queries.
 
 ### AsyncStorage — Local Index + App State
 
@@ -171,8 +167,7 @@ AsyncStorage holds only what the UI needs to render without API calls:
     "id": "e_1710000000000",
     "timestamp": "2026-03-14T09:30:00.000Z",
     "severity": 8,
-    "cycleDay": 3,
-    "symptoms": ["dysmenorrhea"]
+    "cycleDay": 3
   }
 ]
 ```
@@ -285,9 +280,8 @@ severityColor(n):  1-3 → '#22c55e' (green)  4-6 → '#f59e0b' (amber)  7-9 →
 
 severityLabel(n):  1-3 → 'mild'  4-6 → 'moderate'  7-9 → 'severe'  10 → 'emergency'
 
-buildSummaryText(structured, followUp) → string
-  Template: "You logged [label] pain ([n]/10)[, cycle day X].
-  Symptoms: [list]. [Impact: ...] [Follow-up: ...]"
+buildMoorchehText(rawText, severity, cycleDay, followUp) → string
+  Template: "On ${date} (cycle day ${cycleDay}), severity ${severity}/10: ${rawText}${followUp ? ` [Follow-up — ${followUp.question} ${followUp.response}]` : ''}"
 ```
 
 ---
@@ -313,18 +307,27 @@ App
         │   │   │             "GI issues","Exhausted","Heavy bleeding"],
         │   │   │     onSelect: (text) => void })
         │   │   └── ChatInput({ onSubmit: (text) => void, placeholder: "Describe..." })
-        │   ├── step='loading':
-        │   │   └── LoadingPulse({ message: "Understanding your symptoms..." })
+        │   ├── step='severity':
+        │   │   └── SeverityPicker({
+        │   │         onSelect: (severity: number) => void,
+        │   │         options: [
+        │   │           { label: "Mild", value: 3, color: "green-500" },
+        │   │           { label: "Moderate", value: 5, color: "amber-500" },
+        │   │           { label: "Severe", value: 8, color: "red-500" },
+        │   │           { label: "Emergency", value: 10, color: "red-700" }
+        │   │         ]
+        │   │       })
+        │   ├── step='loading-followup':
+        │   │   └── LoadingPulse({ message: "One more moment..." })
         │   ├── step='followup':
         │   │   ├── AgentBubble({ text: followUpQuestion })
         │   │   ├── QuickPickChips({ chips: quickResponses, onSelect })
         │   │   └── ChatInput({ onSubmit, placeholder: "Your answer..." })
-        │   ├── step='confirm':
-        │   │   └── ConfirmationCard({
-        │   │         summary: string, structured: object,
-        │   │         onConfirm: () => void, onDiscard: () => void })
-        │   └── step='fallback':
-        │       └── FallbackForm({ onSubmit: (structured) => void, initialText })
+        │   └── step='confirm':
+        │       └── ConfirmationCard({
+        │             rawText: string, severity: number,
+        │             followUp: { question, response } | null,
+        │             onConfirm: () => void, onDiscard: () => void })
         │
         ├── PrepScreen
         │   │  (uses useAppointmentPrep hook)
@@ -355,51 +358,15 @@ OnboardingScreen (shown once before TabNavigator if !onboarding_done)
 
 ## Agent System Prompts
 
-### Agent 1 — Intake (Structured Extraction)
+There are 3 LLM calls (down from 4 — structured extraction was removed in favor of embeddings):
+- **Agent 1 (follow-up)**: Reads the user's raw text to decide a follow-up question. Only LLM call in the journal flow.
+- **Agent 2 (pattern analysis)**: Reads semantically retrieved entries from Moorcheh to detect cross-cycle patterns.
+- **Agent 3 (GP brief + scripts)**: Reads a Moorcheh RAG summary + pattern analysis to generate clinical output.
+
+### Agent 1 — Follow-Up
 
 ```
-You are a symptom extraction system for a pelvic pain tracking app. You extract structured data from natural language. You are not a doctor. You do not diagnose or advise.
-
-Given the user's symptom description, return a JSON object with exactly this shape:
-
-{"severity":number,"cycleDay":number|null,"symptoms":string[],"functionalImpact":string|null,"notes":""}
-
-FIELD RULES:
-
-severity (1-10):
-- User gives a number → use it directly.
-- "mild"/"a bit"/"slight" → 3. "moderate"/"pretty bad" → 5. "bad"/"really bad"/"severe" → 7. "terrible"/"worst ever"/"can't function" → 9. "emergency"/"need ER" → 10.
-- If unclear, estimate conservatively. Never return 0.
-
-cycleDay:
-- User says "day 14", "CD3" → extract the number.
-- "first day of my period" → 1.
-- Otherwise → null. Do not guess.
-
-symptoms — include all that apply from ONLY this set:
-- "dysmenorrhea" — period cramps, menstrual pain
-- "non-menstrual pelvic pain" — pelvic pain not during period, mid-cycle pain, ovulation pain
-- "dyspareunia" — pain during or after sex
-- "GI symptoms" — nausea, diarrhea, constipation, bloating with pain
-- "fatigue" — exhaustion, can't get out of bed
-- "heavy bleeding" — soaking through pads/tampons, clots
-- "back pain" — lower back pain with pelvic symptoms
-
-functionalImpact:
-- User mentions something they can't do (missed work, left class, cancelled plans, stayed in bed) → short phrase.
-- Not mentioned → null.
-
-notes:
-- Any other clinically relevant detail (medications, heat/cold, timing). Keep brief.
-- If nothing → empty string.
-
-Return ONLY the JSON object. No explanation. No markdown. No extra text.
-```
-
-### Agent 2 — Follow-Up
-
-```
-You decide whether to ask ONE follow-up question about a pelvic pain symptom entry. You receive the user's original text and extracted data.
+You decide whether to ask ONE follow-up question about a pelvic pain symptom entry. You receive the user's raw symptom description and the severity level they selected (mild, moderate, severe, or emergency).
 
 Return a JSON object in one of two formats:
 
@@ -409,32 +376,32 @@ If a follow-up is useful:
 If no follow-up is needed:
 {"question":null}
 
-ASK A FOLLOW-UP ONLY IF one of these applies (check in order, ask only the first match):
+ASK A FOLLOW-UP ONLY IF one of these applies (check in order, ask only the FIRST match):
 
-1. Functional impact mentioned but not quantified → ask how many days/times this cycle.
-   Example question: "You mentioned missing class — roughly how many days has pain kept you from activities this cycle?"
-   Example quickResponses: ["Just today","2-3 days","Most of the week","I've lost count"]
+1. The user mentions missing work, school, or activities but doesn't say how often → ask frequency.
+   Example: "You mentioned missing class — roughly how many days has pain kept you from activities this cycle?"
+   quickResponses: ["Just today","2-3 days","Most of the week","I've lost count"]
 
-2. Severity ≥ 7 but no functional impact mentioned → ask about impact.
-   Example question: "That sounds like significant pain. Has it affected your ability to work, study, or do daily activities?"
-   Example quickResponses: ["Yes, I missed work/school","I'm pushing through","No, I'm managing","I cancelled plans"]
+2. Severity is severe or emergency but the user didn't mention any impact on daily life → ask about it.
+   Example: "That sounds like significant pain. Has it affected your ability to work, study, or do daily activities?"
+   quickResponses: ["Yes, I missed work/school","I'm pushing through","No, I'm managing","I cancelled plans"]
 
-3. Non-menstrual pelvic pain detected → ask if recurring or new.
-   Example question: "Is this mid-cycle pain something you've noticed before, or is it new?"
-   Example quickResponses: ["Happens most cycles","Started recently","First time","Not sure"]
+3. The user describes pain that doesn't seem to be during their period (mid-cycle, ovulation, random timing) → ask if it's recurring.
+   Example: "Is this mid-cycle pain something you've noticed before, or is it new?"
+   quickResponses: ["Happens most cycles","Started recently","First time","Not sure"]
 
-4. 3+ symptom types present → ask which is most disruptive.
-   Example question: "You're dealing with a lot today. Which symptom is bothering you most?"
-   Example quickResponses: [generate 2-3 from detected symptoms in plain language]
+4. The user describes 3+ different symptoms (e.g. cramps + nausea + exhaustion) → ask which is worst.
+   Example: "You're dealing with a lot today. Which symptom is bothering you most?"
+   quickResponses: [2-3 options drawn from what the user actually mentioned, in plain language]
 
-If NONE match → return {"question":null}.
+If NONE of these match → return {"question":null}.
 
-Tone: warm, brief, one sentence. You are not a doctor.
+Tone: warm, brief, one sentence max. You are not a doctor — you are a thoughtful intake assistant.
 
 Return ONLY the JSON object. No explanation. No markdown.
 ```
 
-### Agent 3 — Pattern Analysis
+### Agent 2 — Pattern Analysis
 
 ```
 You analyze symptom entries across menstrual cycles to find clinically significant patterns. You are not a doctor. You NEVER diagnose any condition. You identify patterns and frame them as observations worth discussing with a healthcare provider.
@@ -468,7 +435,7 @@ CRITICAL RULES:
 Return ONLY the JSON object. No explanation. No markdown.
 ```
 
-### Agent 4 — GP Brief + Advocate Scripts
+### Agent 3 — GP Brief + Advocate Scripts
 
 ```
 You generate two things for a patient preparing for a GP appointment about pelvic pain: (1) a structured clinical brief and (2) advocate scripts for common dismissal responses. You are not a doctor. You help patients present their own data clearly.
@@ -515,46 +482,55 @@ callAgent(systemPrompt, userMessage, maxTokens = 1024) → Promise<object>
   5. On parse error after retry → throw ParseError
 ```
 
-Each agent file (`intake.js`, `followUp.js`, etc.) exports a single async function that calls `callAgent` with the appropriate prompt from `prompts.js` and formats the user message.
+Each agent file (`followUp.js`, `patternAnalysis.js`, `gpBrief.js`) exports a single async function that calls `callAgent` with the appropriate prompt from `prompts.js`.
 
 ### Journal Flow State Machine (`hooks/useJournalFlow.js`)
 
+The journal flow has exactly ONE optional LLM call (follow-up). Text and severity are captured
+by the UI — no extraction agent needed. Data is always saved even if the LLM call fails.
+
 ```
-States: idle → loading-intake → followup | confirm → confirm → saved
-                                   ↘ fallback (on error)
+States: idle → severity → loading-followup → followup | confirm → confirm → saved
 
-submitInitial(rawText):
-  1. State → 'loading-intake'
-  2. Call intake(rawText)
-     - Success → store structured result
-     - Failure → state 'fallback', pass rawText to FallbackForm
-  3. Call followUp(rawText, structured)
-     - Returns question → state 'followup', store question + quickResponses
-     - Returns null → state 'confirm'
-     - Failure → silently skip, state 'confirm'
+Step 1 — Text input (no API call):
+  User types free text or taps a quick-pick chip.
+  Store rawText.
+  State → 'severity'
 
-submitFollowUp(responseText):
-  1. Store followUp: { question, response: responseText }
-  2. State → 'confirm'
+Step 2 — Severity tap (no API call):
+  User taps one of 4 buttons: Mild (3) / Moderate (5) / Severe (8) / Emergency (10)
+  Store severity.
+  State → 'loading-followup'
 
-confirm():
-  1. Build entry ID: `e_${Date.now()}`, get timestamp + cycleDay from estimateCycleDay()
-  2. Build Moorcheh text — human-readable sentence:
-     "On cycle day ${cycleDay} (${date}), patient reported ${severityLabel} ${symptomList} rated ${severity}/10.
-      ${functionalImpact ? `Functional impact: ${functionalImpact}.` : ''}
-      ${followUp ? `Follow-up: ${followUp.question} — ${followUp.response}` : ''}"
-  3. Build Moorcheh metadata: { timestamp, severity, cycleDay, symptoms (comma-joined), functionalImpact, cycleNumber }
-  4. Fire both writes in parallel:
-     - moorcheh.uploadEntry(text, metadata)    ← full text to Moorcheh for semantic retrieval
-     - storage.appendEntryIndex({ id, timestamp, severity, cycleDay, symptoms })  ← lightweight record for UI
-  5. Haptic feedback (expo-haptics: notificationAsync success)
-  6. State → 'saved'
-  7. After 800ms → navigate to Home
+Step 3 — Follow-up (single LLM call):
+  Call Agent 1 (followUp) with:
+    user message: "Severity: ${severityLabel}. Description: ${rawText}"
+  - Returns { question, quickResponses } → state 'followup'
+  - Returns { question: null } → state 'confirm'
+  - Failure → silently skip to 'confirm' (non-critical — data is already captured)
+
+Step 4 — Follow-up response (if applicable):
+  User answers the follow-up question (text or quick-pick chip).
+  Store followUp: { question, response }.
+  State → 'confirm'
+
+Step 5 — Confirm:
+  Show ConfirmationCard with: severity badge, raw text, follow-up Q&A if present.
+  User taps "Save":
+    1. Build entry ID: `e_${Date.now()}`, get timestamp + cycleDay from estimateCycleDay()
+    2. Build Moorcheh text:
+       "On ${date} (cycle day ${cycleDay}), severity ${severity}/10: ${rawText}${followUp ? ` [Follow-up — ${followUp.question} ${followUp.response}]` : ''}"
+    3. Fire both writes in parallel:
+       - moorcheh.uploadEntry(text, { timestamp, severity, cycleDay })  ← embedded for semantic retrieval
+       - storage.appendEntryIndex({ id, timestamp, severity, cycleDay })  ← local index for dot matrix
+    4. Haptic feedback (expo-haptics: notificationAsync success)
+    5. State → 'saved'
+    6. After 800ms → navigate to Home
+  User taps "Discard":
+    State → 'idle'
+
   Note: Moorcheh upload is async (1-5s processing). Entry may not be immediately searchable.
         The local index ensures the dot matrix updates instantly.
-
-discard():
-  1. State → 'idle'
 ```
 
 ### Appointment Prep (`hooks/useAppointmentPrep.js`)
@@ -575,9 +551,9 @@ On invocation:
      These are the semantically relevant entries — not a full scan.
 
   5. State → 'analyzing'
-     Call Agent 3 (pattern analysis) with:
+     Call Agent 2 (pattern analysis) with:
        - User message: JSON of { retrievedEntries (text + metadata from Moorcheh), cycleGroups (from local index) }
-       - Agent 3 analyzes the Moorcheh results (rich text) cross-referenced with the local cycle groupings
+       - Agent 2 analyzes the Moorcheh results (rich text) cross-referenced with the local cycle groupings
      - Success → store patternResult
      - Failure → state 'error' with retry. CycleSummaryStats still renders from local index.
 
@@ -588,11 +564,11 @@ On invocation:
           "You are summarizing a patient's pelvic pain symptom log for a GP appointment. Be factual, use clinical language, include all dates and severity scores. Do not diagnose."
         )
         → Returns a pre-assembled RAG summary string.
-     b. (waits for Agent 3 to finish if not already done)
+     b. (waits for Agent 2 to finish if not already done)
 
-     Then call Agent 4 (GP brief) with:
-       - User message: JSON of { moorchehSummary (the RAG answer), patternAnalysis (Agent 3 output) }
-       - Agent 4 formats the brief and generates advocate scripts from pre-assembled context
+     Then call Agent 3 (GP brief) with:
+       - User message: JSON of { moorchehSummary (the RAG answer), patternAnalysis (Agent 2 output) }
+       - Agent 3 formats the brief and generates advocate scripts from pre-assembled context
      - Success → store brief + scripts
      - Failure → state 'error' with retry, still show pattern card if available.
 
@@ -603,14 +579,15 @@ On invocation:
 
 | Scenario | UI |
 |----------|-----|
-| Agent 1 running | LoadingPulse: "Understanding your symptoms..." |
-| Agent 1 failed | FallbackForm shown, toast: "AI unavailable — log manually" |
-| Agent 2 running | LoadingPulse: "One more moment..." |
-| Agent 2 failed | Skip silently to confirmation |
-| Agent 3 running | LoadingPulse: "Analyzing your patterns..." |
-| Agent 3 failed | "Analysis unavailable" card + retry. Raw stats still shown. |
-| Agent 4 running | LoadingPulse: "Preparing your GP brief..." |
-| Agent 4 failed | "Brief unavailable" card + retry. Pattern card still shown. |
+| Agent 1 (follow-up) running | LoadingPulse: "One more moment..." |
+| Agent 1 (follow-up) failed | Skip silently to confirmation. Data is already captured — this is non-critical. |
+| Moorcheh upload failed | Toast: "Entry saved locally, sync pending." Local index still updated. Retry on next app open. |
+| Moorcheh retrieval running | LoadingPulse: "Retrieving your entries..." |
+| Agent 2 (patterns) running | LoadingPulse: "Analyzing your patterns..." |
+| Agent 2 (patterns) failed | "Analysis unavailable" card + retry. Raw cycle stats still shown from local index. |
+| Moorcheh RAG running | LoadingPulse: "Preparing your summary..." |
+| Agent 3 (GP brief) running | LoadingPulse: "Generating your GP brief..." |
+| Agent 3 (GP brief) failed | "Brief unavailable" card + retry. Pattern card still shown if available. |
 
 ---
 
@@ -640,15 +617,15 @@ On invocation:
 ### Phase 3: Journal Flow (build third — primary user action, produces data for everything else)
 
 16. `agents/client.js` — fetch wrapper pointing to deployed worker
-17. `agents/prompts.js` — all 4 system prompts
-18. `agents/intake.js` + `agents/followUp.js`
-19. `hooks/useJournalFlow.js` — state machine (confirm writes to both Moorcheh + local index)
+17. `agents/prompts.js` — all 3 system prompts
+18. `agents/followUp.js` — Agent 1 (only LLM call in journal flow)
+19. `hooks/useJournalFlow.js` — state machine (text → severity tap → follow-up → confirm → Moorcheh + local index)
 20. `JournalScreen.jsx` — wire up the flow
-21. `AgentBubble.jsx`, `QuickPickChips.jsx`, `ChatInput.jsx`
-22. `ConfirmationCard.jsx`
-23. `FallbackForm.jsx` — severity slider + symptom checkboxes + text
+21. `SeverityPicker.jsx` — 4-button severity tap (mild/moderate/severe/emergency)
+22. `AgentBubble.jsx`, `QuickPickChips.jsx`, `ChatInput.jsx`
+23. `ConfirmationCard.jsx`
 24. `LoadingPulse.jsx`
-25. Test: type symptom → extraction → follow-up → confirm → verify entry in both Moorcheh (via queryEntries) and local index
+25. Test: type symptom → tap severity → follow-up → confirm → verify entry in both Moorcheh (via queryEntries) and local index
 
 ### Phase 4: Home Screen (build fourth — needs entries to be meaningful)
 
@@ -662,16 +639,16 @@ On invocation:
 
 ### Phase 5: Appointment Prep (build fifth — needs multi-cycle data)
 
-33. `agents/patternAnalysis.js` — calls moorcheh.queryEntries for targeted retrieval, then Agent 3
-34. `agents/gpBrief.js` — calls moorcheh.answerFromEntries for RAG summary, then Agent 4
-35. `hooks/useAppointmentPrep.js` — orchestrates retrieval → Agent 3 → RAG → Agent 4
+33. `agents/patternAnalysis.js` — calls moorcheh.queryEntries for targeted retrieval, then Agent 2
+34. `agents/gpBrief.js` — calls moorcheh.answerFromEntries for RAG summary, then Agent 3
+35. `hooks/useAppointmentPrep.js` — orchestrates retrieval → Agent 2 → RAG → Agent 3
 36. `PrepScreen.jsx`
 37. `Disclaimer.jsx`
 38. `CycleSummaryStats.jsx` — reads from local entry index
 39. `PatternInsightCard.jsx`
 40. `GPBriefCard.jsx` + share via `Share.share()` (React Native Share API)
 41. `AdvocateScriptItem.jsx` — expandable/collapsible
-42. Test: with seeded multi-cycle data, verify Moorcheh retrieval → pattern detection → brief generation
+42. Test: with seeded multi-cycle data, verify Moorcheh semantic retrieval → pattern detection → RAG summary → brief generation
 
 ### Phase 6: Onboarding + Settings + Polish
 
