@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View,
   Text,
+  TextInput,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
@@ -11,10 +12,37 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { useAppointmentPrep } from '../hooks/useAppointmentPrep';
+import { callAgent } from '../agents/client';
 
 export default function PrepScreen() {
   const { status, patternResult, briefResult, cycleGroups, error, run } =
     useAppointmentPrep();
+
+  const [customDismissal, setCustomDismissal] = useState('');
+  const [customScript, setCustomScript] = useState(null);
+  const [customLoading, setCustomLoading] = useState(false);
+
+  const handleCustomScript = async () => {
+    if (!customDismissal.trim()) return;
+    setCustomLoading(true);
+    setCustomScript(null);
+    try {
+      const result = await callAgent(
+        `You help patients with pelvic pain respond to dismissive doctor comments. Given what the doctor said, return a 3-part response as JSON:
+- whyItMatters: 1-2 plain language sentences explaining why this is a problem. Written to the patient, warm and clear, no jargon.
+- script: 2-3 sentences the patient can actually say out loud. Simple, calm, firm. Natural spoken language — they may be nervous. Say "recent guidelines" not citation names.
+- ifStillDismissed: one concrete follow-up ask (referral, second opinion, or noting it in their chart).
+Return ONLY: { "whyItMatters": "...", "script": "...", "ifStillDismissed": "..." }`,
+        `My doctor said: "${customDismissal.trim()}"`,
+        { maxTokens: 400, temperature: 0.5 }
+      );
+      setCustomScript(result);
+    } catch {
+      setCustomScript({ whyItMatters: null, script: 'Unable to generate a response. Try again.', ifStillDismissed: null });
+    } finally {
+      setCustomLoading(false);
+    }
+  };
 
   useEffect(() => { run(); }, []);
 
@@ -64,10 +92,10 @@ export default function PrepScreen() {
   );
 
   const stats = [
-    { value: String(cycleGroups.length), label: 'cycles logged' },
-    { value: String(severeDays), label: 'severe days total' },
-    { value: missedStat?.value ?? '—', label: 'missed commitments' },
-    { value: midCycleFinding ? `${midCycleFinding.cyclesPresent}/${cycleGroups.length}` : '—', label: 'cycles w/ mid-cycle pain' },
+    { value: String(cycleGroups.length), label: 'cycles logged', detail: null },
+    { value: String(severeDays), label: 'severe days total', detail: null },
+    { value: missedStat?.value ?? '—', label: 'missed commitments', detail: missedStat?.detail ?? null },
+    { value: cycleGroups.length >= 2 ? `${midCycleFinding ? midCycleFinding.cyclesPresent : 0}/${cycleGroups.length}` : '—', label: 'cycles w/ mid-cycle pain', detail: null },
   ];
 
   // Date range label
@@ -109,7 +137,8 @@ export default function PrepScreen() {
       <View style={s.statsGrid}>
         {stats.map((stat) => (
           <View key={stat.label} style={s.statCard}>
-            <Text style={s.statValue}>{stat.value}</Text>
+            <Text style={[s.statValue, stat.detail && { marginBottom: 2 }]}>{stat.value}</Text>
+            {stat.detail && <Text style={{ fontSize: 12, color: '#7A6872', marginBottom: 6, lineHeight: 17 }}>{stat.detail}</Text>}
             <Text style={s.statLabel}>{stat.label}</Text>
           </View>
         ))}
@@ -121,14 +150,86 @@ export default function PrepScreen() {
         {advocateScripts?.map((item, i) => (
           <View key={i} style={[s.advocateCard, i > 0 && s.advocateBorder]}>
             <Text style={s.dismissalLabel}>"{item.dismissalType}"</Text>
+            {item.whyItMatters && (
+              <Text style={{ fontSize: 13, color: '#A8969F', lineHeight: 19, marginBottom: 8 }}>{item.whyItMatters}</Text>
+            )}
             <Text style={s.scriptText}>You can say: "{item.script}"</Text>
+            {item.ifStillDismissed && (
+              <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#F0E0E0' }}>
+                <Text style={{ fontSize: 12, color: '#A8969F', marginBottom: 3 }}>if they still dismiss you</Text>
+                <Text style={{ fontSize: 13, color: '#5C3D4A', lineHeight: 19 }}>{item.ifStillDismissed}</Text>
+              </View>
+            )}
           </View>
         ))}
       </View>
 
+      {/* Custom dismissal input */}
+      <View style={{
+        marginTop: 10,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: '#F0E0E0',
+        padding: 14,
+      }}>
+        <Text style={{ color: '#A8969F', fontSize: 12, marginBottom: 8 }}>something else your doctor said?</Text>
+        <TextInput
+          value={customDismissal}
+          onChangeText={setCustomDismissal}
+          placeholder='e.g. "your pain is just stress"'
+          placeholderTextColor="#C4B0B8"
+          multiline
+          style={{
+            color: '#2D1520',
+            fontSize: 14,
+            lineHeight: 20,
+            textAlignVertical: 'top',
+            minHeight: 44,
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderBottomColor: '#F0E0E0',
+            paddingBottom: 10,
+            marginBottom: 10,
+          }}
+        />
+        <TouchableOpacity
+          onPress={handleCustomScript}
+          disabled={customLoading || !customDismissal.trim()}
+          activeOpacity={0.7}
+          style={{
+            alignSelf: 'flex-end',
+            paddingHorizontal: 14,
+            paddingVertical: 8,
+            backgroundColor: customDismissal.trim() ? '#2D1520' : '#F0E0E0',
+            borderRadius: 8,
+          }}
+        >
+          {customLoading
+            ? <ActivityIndicator size="small" color="#FFFFFF" />
+            : <Text style={{ color: customDismissal.trim() ? '#FFF8F6' : '#A8969F', fontSize: 13, fontWeight: '500' }}>get response</Text>
+          }
+        </TouchableOpacity>
+
+        {customScript && (
+          <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#F0E0E0' }}>
+            {customScript.whyItMatters && (
+              <Text style={{ fontSize: 13, color: '#A8969F', lineHeight: 19, marginBottom: 10 }}>{customScript.whyItMatters}</Text>
+            )}
+            <Text style={{ color: '#A8969F', fontSize: 11, fontWeight: '600', letterSpacing: 0.4, marginBottom: 4 }}>YOU CAN SAY</Text>
+            <Text style={{ color: '#5C3D4A', fontSize: 13, lineHeight: 20, marginBottom: 10 }}>"{customScript.script}"</Text>
+            {customScript.ifStillDismissed && (
+              <View style={{ paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#F0E0E0' }}>
+                <Text style={{ fontSize: 12, color: '#A8969F', marginBottom: 3 }}>if they still dismiss you</Text>
+                <Text style={{ color: '#5C3D4A', fontSize: 13, lineHeight: 19 }}>{customScript.ifStillDismissed}</Text>
+              </View>
+            )}
+          </View>
+        )}
+      </View>
+
       {/* ── GP BRIEF SECTION ── */}
       <View style={s.gpBriefHeader}>
-        <Text style={s.gpBriefTitle}>GP brief</Text>
+        <Text style={s.gpBriefTitle}>GP brief <Text style={{ fontWeight: '400', color: '#A8969F' }}>(for your doctor)</Text></Text>
         {Platform.OS === 'web' ? (
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <TouchableOpacity style={s.shareBtn} onPress={handleShare} activeOpacity={0.7}>
@@ -247,8 +348,8 @@ const s = StyleSheet.create({
 
   // Stats grid
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  statCard: { width: '47%', backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: '#F0E0E0' },
-  statValue: { fontSize: 28, fontWeight: '700', color: '#2D1520', marginBottom: 4 },
+  statCard: { width: '47%', backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, boxShadow: '0 2px 10px rgba(45, 21, 32, 0.08)' },
+  statValue: { fontSize: 22, fontWeight: '700', color: '#2D1520', marginBottom: 4 },
   statLabel: { fontSize: 13, color: '#A8969F' },
 
   // Advocate scripts
@@ -264,7 +365,7 @@ const s = StyleSheet.create({
   shareBtn: { backgroundColor: '#F0E0E0', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
   shareBtnText: { fontSize: 13, color: '#A8969F', fontWeight: '500' },
 
-  gpCard: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 20, borderWidth: StyleSheet.hairlineWidth, borderColor: '#F0E0E0' },
+  gpCard: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 20, boxShadow: '0 2px 10px rgba(45, 21, 32, 0.08)' },
   gpDocTitle: { fontSize: 15, fontWeight: '600', color: '#2D1520', marginBottom: 4 },
   gpDocSub: { fontSize: 13, color: '#A8969F', marginBottom: 16 },
 

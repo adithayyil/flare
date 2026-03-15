@@ -13,6 +13,7 @@ import { useState, useRef, useEffect } from 'react';
 import Animated, { FadeIn, useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 import { Mic } from 'lucide-react-native';
 import InfoTip from '../components/InfoTip';
+import { useNavigation } from '@react-navigation/native';
 import { useJournalFlow } from '../hooks/useJournalFlow';
 import BubbleQuestion from '../components/BubbleQuestion';
 import BubbleReply from '../components/BubbleReply';
@@ -28,6 +29,7 @@ function severityColor(n) {
 }
 
 export default function JournalScreen() {
+  const navigation = useNavigation();
   const {
     state,
     symptomText,
@@ -346,8 +348,8 @@ export default function JournalScreen() {
               <Animated.View entering={FadeIn.duration(200)}>
                 <BubbleQuestion>{followUpQuestion}</BubbleQuestion>
 
-                {followUpOptions && followUpOptions.length > 0 ? (
-                  <View style={{ gap: 8, marginBottom: 16 }}>
+                {followUpOptions && followUpOptions.length > 0 && (
+                  <View style={{ gap: 8, marginBottom: 12 }}>
                     {followUpOptions.map((option, i) => (
                       <TouchableOpacity
                         key={i}
@@ -360,7 +362,7 @@ export default function JournalScreen() {
                           paddingVertical: 12,
                           paddingHorizontal: 16,
                           borderRadius: 12,
-                          backgroundColor: '#FFFFFF',
+                          backgroundColor: followUpAnswer === option ? '#F0E0E0' : '#FFFFFF',
                           borderWidth: StyleSheet.hairlineWidth,
                           borderColor: '#F0E0E0',
                         }}
@@ -369,27 +371,26 @@ export default function JournalScreen() {
                       </TouchableOpacity>
                     ))}
                   </View>
-                ) : (
-                  <TextInput
-                    value={followUpAnswer}
-                    onChangeText={setFollowUpAnswer}
-                    placeholder="your answer..."
-                    placeholderTextColor="#A8969F"
-                    multiline
-                    autoFocus
-                    style={{
-                      color: '#2D1520',
-                      fontSize: 15,
-                      lineHeight: 22,
-                      textAlignVertical: 'top',
-                      minHeight: 50,
-                      borderBottomWidth: StyleSheet.hairlineWidth,
-                      borderBottomColor: '#F0E0E0',
-                      paddingBottom: 12,
-                      marginBottom: 12,
-                    }}
-                  />
                 )}
+
+                <TextInput
+                  value={followUpAnswer}
+                  onChangeText={setFollowUpAnswer}
+                  placeholder={followUpOptions?.length > 0 ? 'or add your own...' : 'your answer...'}
+                  placeholderTextColor="#A8969F"
+                  multiline
+                  style={{
+                    color: '#2D1520',
+                    fontSize: 15,
+                    lineHeight: 22,
+                    textAlignVertical: 'top',
+                    minHeight: 44,
+                    borderBottomWidth: StyleSheet.hairlineWidth,
+                    borderBottomColor: '#F0E0E0',
+                    paddingBottom: 12,
+                    marginBottom: 12,
+                  }}
+                />
 
                 <TouchableOpacity onPress={skipFollowUp} style={{ paddingVertical: 12 }}>
                   <Text style={{ color: '#A8969F', fontSize: 14, textDecorationLine: 'underline' }}>skip this question</Text>
@@ -471,6 +472,16 @@ export default function JournalScreen() {
                 <Text style={{ color: '#2D1520', fontSize: 14, lineHeight: 21 }}>
                   {journalAlert}
                 </Text>
+                <TouchableOpacity
+                  onPress={() => { reset(); navigation.navigate('Prep'); }}
+                  activeOpacity={0.7}
+                  style={{ marginTop: 12 }}
+                >
+                  <Text style={{ color: '#A8969F', fontSize: 13 }}>
+                    seeing your doctor soon?{' '}
+                    <Text style={{ color: '#2D1520', fontWeight: '500' }}>prepare what to say</Text>
+                  </Text>
+                </TouchableOpacity>
               </Animated.View>
             )}
 

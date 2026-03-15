@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { SafeAreaView, ScrollView, View, Text, Alert, TouchableOpacity, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { ChevronLeft } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
-import { seedData } from '../lib/seedData';
+import { reseedData } from '../lib/seedData';
 import { clearAllData } from '../lib/storage';
 import { clearPatientEntries } from '../lib/moorcheh';
 
@@ -10,11 +10,12 @@ export default function SettingsScreen() {
   const navigation = useNavigation();
   const [loading, setLoading] = useState(false);
 
-  const handleSeedData = async () => {
+  const handleSeedData = async (variant) => {
     setLoading(true);
     try {
-      await seedData(true);
-      Alert.alert('Done', 'Seeded 12 entries across 3 cycles');
+      await reseedData(variant, true);
+      const labels = { none: 'No pattern', mild: 'Mild', moderate: 'Moderate', severe: 'Severe (constellation)' };
+      Alert.alert('Done', `Loaded: ${labels[variant]}`);
     } catch (error) {
       Alert.alert('Error', error.message);
     } finally {
@@ -68,8 +69,11 @@ export default function SettingsScreen() {
 
         {/* Dev section */}
         <View style={{ paddingHorizontal: 20, marginTop: 20 }}>
-          <Text style={{ color: '#A8969F', fontSize: 11, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 16 }}>
+          <Text style={{ color: '#A8969F', fontSize: 11, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 4 }}>
             development
+          </Text>
+          <Text style={{ color: '#A8969F', fontSize: 12, marginBottom: 16 }}>
+            loading a dataset clears existing data first
           </Text>
 
           <View style={{
@@ -79,25 +83,35 @@ export default function SettingsScreen() {
             borderColor: '#F0E0E0',
             overflow: 'hidden',
           }}>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={handleSeedData}
-              disabled={loading}
-              style={{
-                paddingVertical: 14,
-                paddingHorizontal: 16,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                opacity: loading ? 0.5 : 1,
-              }}
-            >
-              <View>
-                <Text style={{ color: '#2D1520', fontSize: 15 }}>seed test data</Text>
-                <Text style={{ color: '#A8969F', fontSize: 13, marginTop: 2 }}>12 sample entries</Text>
+            {[
+              { variant: 'none',     label: 'no pattern',   sub: '2 cycles · severity 1–4' },
+              { variant: 'mild',     label: 'mild',         sub: '2 cycles · borderline pain' },
+              { variant: 'moderate', label: 'moderate',     sub: '3 cycles · dysmenorrhea flagged' },
+              { variant: 'severe',   label: 'severe',       sub: '3 cycles · full constellation' },
+            ].map(({ variant, label, sub }, i, arr) => (
+              <View key={variant}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => handleSeedData(variant)}
+                  disabled={loading}
+                  style={{
+                    paddingVertical: 14,
+                    paddingHorizontal: 16,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    opacity: loading ? 0.5 : 1,
+                  }}
+                >
+                  <View>
+                    <Text style={{ color: '#2D1520', fontSize: 15 }}>load {label} data</Text>
+                    <Text style={{ color: '#A8969F', fontSize: 13, marginTop: 2 }}>{sub}</Text>
+                  </View>
+                  {loading && <ActivityIndicator size="small" color="#A8969F" />}
+                </TouchableOpacity>
+                {i < arr.length - 1 && <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: '#F0E0E0', marginHorizontal: 16 }} />}
               </View>
-              {loading && <ActivityIndicator size="small" color="#A8969F" />}
-            </TouchableOpacity>
+            ))}
 
             <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: '#F0E0E0', marginHorizontal: 16 }} />
 

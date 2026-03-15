@@ -65,25 +65,32 @@ STEP 2 — GP BRIEF + ADVOCATE SCRIPTS + PATIENT SUMMARY
 
 You will receive the Moorcheh RAG summary of all logged entries. Using your pattern analysis above AND this summary, generate:
 
-{"gpBrief":{"title":"Patient-Reported Pelvic Pain Symptom Log","patientNote":"This log was generated from [X] entries tracked over [Y] menstrual cycles using a structured symptom journal. All data is patient-reported.","cycleSummaries":[{"cycleLabel":"Cycle starting [date]","entries":[{"date":"YYYY-MM-DD","cycleDay":"number or unknown","severity":"N/10","symptoms":"comma-separated","functionalImpact":"description or none reported"}],"cycleSummary":"One sentence summarizing this cycle"}],"overallPattern":"2-3 sentences on cross-cycle patterns in clinical language. Do not diagnose.","patientRequest":"Based on these patterns, I would like to discuss whether further investigation is appropriate, including [relevant next steps]. I understand diagnosis requires clinical assessment and I am sharing this log to support that process."},"advocateScripts":[{"dismissalType":"short label","scenario":"one sentence on when GP might say this","script":"2-4 sentences referencing specific data from the log. Firm but respectful. Partnership framing."}],"patientSummary":{"headline":"2-3 sentences in plain language summarizing what the data shows. Warm, direct, no clinical jargon.","keyNumbers":[{"label":"Cycles tracked","value":"number"},{"label":"Highest severity","value":"N/10"},{"label":"Days of missed activities","value":"number or estimated range"}],"whatToSayFirst":"One sentence: what to lead with at the appointment to be taken seriously.","closing":"One warm validating sentence. The patient deserves to be heard."}}
+{"gpBrief":{"title":"Patient-Reported Pelvic Pain Symptom Log","patientNote":"This log was generated from [X] entries tracked over [Y] menstrual cycles using a structured symptom journal. All data is patient-reported.","cycleSummaries":[{"cycleLabel":"Cycle starting [date]","entries":[{"date":"YYYY-MM-DD","cycleDay":"number or unknown","severity":"N/10","symptoms":"comma-separated","functionalImpact":"description or none reported"}],"cycleSummary":"One sentence summarizing this cycle"}],"overallPattern":"2-3 sentences on cross-cycle patterns in clinical language. Do not diagnose.","patientRequest":"Based on these patterns, I would like to discuss whether further investigation is appropriate, including [relevant next steps]. I understand diagnosis requires clinical assessment and I am sharing this log to support that process."},"advocateScripts":[{"dismissalType":"short label","whyItMatters":"1-2 plain language sentences explaining why this dismissal is a problem — no jargon, no citations. Written to the patient, not the doctor.","script":"2-3 sentences the patient can actually say out loud. Simple, calm, firm. No clinical citations in the patient's mouth — say 'recent guidelines' not 'ACOG CPG No. 11'. Reference specific data from the log (severity scores, missed days).","ifStillDismissed":"One concrete follow-up ask e.g. a referral, second opinion, or asking for it to be noted in their chart."}],"patientSummary":{"headline":"2-3 sentences in plain language summarizing what the data shows. Warm, direct, no clinical jargon.","keyNumbers":[{"label":"Cycles tracked","value":"number","detail":null},{"label":"Highest severity","value":"N/10","detail":"brief context e.g. on day 1 of cycle"},{"label":"Days of missed activities","value":"number or short range only","detail":"brief explanation in plain language e.g. full-day absences and partial days"}],"whatToSayFirst":"One sentence: what to lead with at the appointment to be taken seriously.","closing":"One warm validating sentence. The patient deserves to be heard."}}
 
 ADVOCATE SCRIPTS — generate 2-3 most relevant to this patient's data:
-1. "Period pain is normal" → ACOG (2026) + SOGC both state functionally disruptive dysmenorrhea warrants investigation. Reference specific severity scores and missed days.
-2. "Try painkillers / birth control first" → Patient is open to symptom management AND requesting concurrent investigation into cause.
-3. "You're too young" → ACOG CPG No. 11 explicitly includes adolescents. Reference the 4-11 year delay and documented tracking.
-4. "Your tests came back fine" → ACOG (2026) explicitly states negative imaging does not rule out endometriosis.
-5. "It's probably stress" → Symptoms correlate with specific cycle days, not stress events. Reference cycle-day timing.
-6. "Let's wait and see" → Patient HAS been tracking. Reference entry count and first log date. ACOG names delay as a documented harm.
+1. "Period pain is normal" → whyItMatters: pain that stops you functioning is not normal and is worth investigating. script: reference severity scores and missed days. ifStillDismissed: ask for gynaecology referral.
+2. "Try painkillers / birth control first" → whyItMatters: symptom management and finding the cause can happen at the same time. script: patient is open to both, not refusing treatment. ifStillDismissed: ask for referral while starting treatment.
+3. "You're too young" → whyItMatters: pelvic pain conditions affect people of all ages. script: reference tracking duration and pattern. ifStillDismissed: ask for it to be noted in chart and request follow-up.
+4. "Your tests came back fine" → whyItMatters: normal test results don't rule out conditions like endometriosis. script: tests are one piece. ifStillDismissed: ask for specialist referral.
+5. "It's probably stress" → whyItMatters: symptoms follow a clear cycle-day pattern, not random stress events. script: reference specific cycle days logged. ifStillDismissed: ask what would need to be true for further investigation.
+6. "Let's wait and see" → whyItMatters: patient has already been tracking — the waiting has happened. script: reference log duration. ifStillDismissed: ask what the criteria are for investigation.
+
+TONE RULES FOR ADVOCATE SCRIPTS:
+- whyItMatters is for the patient to READ before speaking — it builds their confidence. Warm, clear, validating.
+- script is for the patient to SAY — natural spoken language, not formal. A sentence they could actually get out while nervous.
+- ifStillDismissed is a concrete single ask. Not a threat. A reasonable next step.
 
 GP BRIEF RULES:
 - Clinical language: "patient reports", "severity rated X/10", "functional impairment noted"
 - Keep to one page of content. Concise cycle summaries.
 - Cite both: "per ACOG Clinical Practice Guideline No. 11 (2026) and SOGC Clinical Practice Guidelines" when referencing clinical criteria. Only cite if grounded in your context.
+- Dysmenorrhea threshold: use 7/10 or above only. Do not reference severity ≥ 6 as dysmenorrhea.
+- findings array: maximum 5 bullets. Prioritise the most clinically significant patterns.
 
 PATIENT SUMMARY RULES:
 - Plain language only. No clinical terms.
 - headline should feel validating, not alarming
-- keyNumbers pulled directly from the data — no estimates unless necessary
+- keyNumbers: value must be a short number or range ONLY (e.g. "6", "2–3", "9/10"). Put any explanation in the detail field. detail can be null if nothing to add.
 - whatToSayFirst is one concrete sentence the patient can literally say to open the conversation
 - closing is warm and grounding — the patient is doing the right thing by tracking
 

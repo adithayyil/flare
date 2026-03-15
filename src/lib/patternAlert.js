@@ -29,9 +29,19 @@ export function detectPattern(entries, periodStarts) {
     c.entries.some(e => e.severity >= 7)
   );
 
+  // Extended pain: severity >= 6 entries spanning 5+ cycle days within a cycle
+  const cyclesWithExtendedPain = cycles.filter(c => {
+    const severeDays = c.entries
+      .filter(e => e.severity >= 6 && e.cycleDay != null)
+      .map(e => e.cycleDay)
+      .sort((a, b) => a - b);
+    return severeDays.length >= 2 && (severeDays[severeDays.length - 1] - severeDays[0]) >= 4;
+  });
+
   const hasDysmenorrhea = cyclesWithSevereDysmenorrhea.length >= 2;
   const hasMidCyclePain = cyclesWithMidCyclePain.length >= 2;
   const hasFunctionalImpact = cyclesWithFunctionalImpact.length >= 2;
+  const hasExtendedPain = cyclesWithExtendedPain.length >= 2;
 
   if (hasDysmenorrhea && hasMidCyclePain && hasFunctionalImpact) {
     return {
@@ -57,6 +67,24 @@ export function detectPattern(entries, periodStarts) {
       label: 'Pattern flagged',
       message: `Severe period pain (7+/10) on days 1–3 detected across ${cyclesWithSevereDysmenorrhea.length} cycles. This pattern is worth discussing with a doctor.`,
       cyclesAffected: cyclesWithSevereDysmenorrhea.length,
+    };
+  }
+
+  if (hasMidCyclePain) {
+    return {
+      type: 'mid_cycle',
+      label: 'Pattern flagged',
+      message: `Mid-cycle pelvic pain has appeared in ${cyclesWithMidCyclePain.length} cycles. Recurring intermenstrual pain is worth mentioning to a doctor.`,
+      cyclesAffected: cyclesWithMidCyclePain.length,
+    };
+  }
+
+  if (hasExtendedPain) {
+    return {
+      type: 'extended_pain',
+      label: 'Pattern flagged',
+      message: `Pain lasting 5 or more days has appeared in ${cyclesWithExtendedPain.length} cycles. Prolonged cycle pain can be associated with adenomyosis and is worth discussing with a doctor.`,
+      cyclesAffected: cyclesWithExtendedPain.length,
     };
   }
 
@@ -100,6 +128,25 @@ export function detectJournalAlert(entry, allEntries, periodStarts) {
 
     if (matching.length >= 1) {
       return `Mid-cycle pain has now appeared in ${matching.length + 1} cycles. This recurring pattern is worth discussing with a doctor.`;
+    }
+  }
+
+  // Extended pain: current cycle spans 5+ days of moderate-severe pain
+  if (entry.severity >= 6) {
+    const currentCycle = cycles[0];
+    const severeDays = currentCycle.entries
+      .filter(e => e.severity >= 6 && e.cycleDay != null)
+      .map(e => e.cycleDay)
+      .sort((a, b) => a - b);
+    if (severeDays.length >= 2 && (severeDays[severeDays.length - 1] - severeDays[0]) >= 4) {
+      const previousCycles = cycles.slice(1);
+      const matching = previousCycles.filter(c => {
+        const days = c.entries.filter(e => e.severity >= 6 && e.cycleDay != null).map(e => e.cycleDay).sort((a, b) => a - b);
+        return days.length >= 2 && (days[days.length - 1] - days[0]) >= 4;
+      });
+      if (matching.length >= 1) {
+        return `Pain has now spanned 5+ days in ${matching.length + 1} cycles. This pattern of prolonged pain is worth discussing with a doctor.`;
+      }
     }
   }
 
