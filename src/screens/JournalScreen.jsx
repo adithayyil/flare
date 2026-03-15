@@ -8,13 +8,15 @@ import {
   ScrollView,
   StyleSheet,
 } from 'react-native';
-import { useState } from 'react';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import { useState, useRef, useEffect } from 'react';
+import Animated, { FadeIn, useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
+import { Mic } from 'lucide-react-native';
 import { useJournalFlow } from '../hooks/useJournalFlow';
 import BubbleQuestion from '../components/BubbleQuestion';
 import BubbleReply from '../components/BubbleReply';
 import BottomSheet from '../components/BottomSheet';
 import { MANKOSKI_SCALE } from '../lib/severity';
+import { transcribeAudio } from '../lib/whisper';
 
 function severityColor(n) {
   if (n <= 3) return '#FBC4AB';
@@ -47,6 +49,131 @@ export default function JournalScreen() {
     isConfirm,
     isSaved,
   } = useJournalFlow();
+
+  const [micState, setMicState] = useState('idle'); // idle | recording | transcribing
+  const mediaRecorderRef = useRef(null);
+  const chunksRef = useRef([]);
+  const streamRef = useRef(null);
+  const silenceTimerRef = useRef(null);
+  const analyserRef = useRef(null);
+  const silenceFramesRef = useRef(0);
+  const stopRef = useRef(null);
+
+  const SILENCE_THRESHOLD = 3; // RMS level below which = silence
+  const SILENCE_DURATION = 2000; // ms of silence before auto-stop
+  const CHECK_INTERVAL = 100; // ms between silence checks
+
+  // Pulsing animation for recording indicator
+  const pulseOpacity = useSharedValue(1);
+  useEffect(() => {
+    if (micState === 'recording') {
+      pulseOpacity.value = withRepeat(withTiming(0.3, { duration: 800 }), -1, true);
+    } else {
+      pulseOpacity.value = 1;
+    }
+  }, [micState]);
+  const pulseStyle = useAnimatedStyle(() => ({ opacity: pulseOpacity.value }));
+
+  function startSilenceDetection(stream) {
+    const audioCtx = new AudioContext();
+    const source = audioCtx.createMediaStreamSource(stream);
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 512;
+    source.connect(analyser);
+    analyserRef.current = { audioCtx, analyser };
+
+    const data = new Uint8Array(analyser.fftSize);
+    silenceFramesRef.current = 0;
+    const framesNeeded = SILENCE_DURATION / CHECK_INTERVAL;
+
+    silenceTimerRef.current = setInterval(() => {
+      analyser.getByteTimeDomainData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) {
+        const v = data[i] - 128;
+        sum += v * v;
+      }
+      const rms = Math.sqrt(sum / data.length);
+
+      console.log('rms:', rms.toFixed(1));
+      if (rms < SILENCE_THRESHOLD) {
+        silenceFramesRef.current++;
+        if (silenceFramesRef.current >= framesNeeded) {
+          stopRef.current?.();
+        }
+      } else {
+        silenceFramesRef.current = 0;
+      }
+    }, CHECK_INTERVAL);
+  }
+
+  function cleanupSilenceDetection() {
+    clearInterval(silenceTimerRef.current);
+    analyserRef.current?.audioCtx.close();
+    analyserRef.current = null;
+    silenceFramesRef.current = 0;
+  }
+
+  async function startRecording() {
+    try {
+      if (Platform.OS === 'web') {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streamRef.current = stream;
+        const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+        chunksRef.current = [];
+        recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+        recorder.start();
+        mediaRecorderRef.current = recorder;
+        startSilenceDetection(stream);
+      } else {
+        const { Audio } = require('expo-av');
+        await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+        const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+        mediaRecorderRef.current = recording;
+      }
+      setMicState('recording');
+    } catch (err) {
+      console.warn('Mic access denied:', err);
+    }
+  }
+
+  async function stopAndTranscribe() {
+    cleanupSilenceDetection();
+    setMicState('transcribing');
+    try {
+      let blob;
+      if (Platform.OS === 'web') {
+        const recorder = mediaRecorderRef.current;
+        await new Promise((resolve) => { recorder.onstop = resolve; recorder.stop(); });
+        streamRef.current?.getTracks().forEach((t) => t.stop());
+        blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+      } else {
+        const recording = mediaRecorderRef.current;
+        await recording.stopAndUnloadAsync();
+        const uri = recording.getURI();
+        const response = await fetch(uri);
+        blob = await response.blob();
+      }
+
+      const text = await transcribeAudio(blob);
+      if (text) {
+        setSymptomText((prev) => (prev ? prev + ' ' + text : text));
+      }
+    } catch (err) {
+      console.warn('Transcription error:', err);
+    } finally {
+      mediaRecorderRef.current = null;
+      setMicState('idle');
+    }
+  }
+
+  // Keep stopRef in sync so silence detection can call it
+  stopRef.current = stopAndTranscribe;
+
+  function toggleMic() {
+    if (micState === 'idle') startRecording();
+    else if (micState === 'recording') stopAndTranscribe();
+  }
 
   const showConversation = severity !== null;
 
@@ -89,8 +216,50 @@ export default function JournalScreen() {
               lineHeight: 24,
               textAlignVertical: 'top',
               minHeight: 100,
+              paddingRight: 40,
             }}
           />
+
+          {/* Mic button */}
+          {!showConversation && !isSaved && (
+            <TouchableOpacity
+              onPress={toggleMic}
+              disabled={micState === 'transcribing'}
+              activeOpacity={0.7}
+              style={{
+                position: 'absolute',
+                bottom: 12,
+                right: 12,
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: micState === 'recording' ? '#F08080' : 'transparent',
+              }}
+            >
+              {micState === 'recording' ? (
+                <Animated.View style={pulseStyle}>
+                  <Mic size={18} color="#FFFFFF" />
+                </Animated.View>
+              ) : micState === 'transcribing' ? (
+                <Text style={{ color: '#A8969F', fontSize: 11 }}>...</Text>
+              ) : (
+                <Mic size={18} color="#A8969F" />
+              )}
+            </TouchableOpacity>
+          )}
+
+          {/* Recording label */}
+          {micState === 'recording' && (
+            <Animated.View entering={FadeIn.duration(200)} style={{
+              position: 'absolute',
+              bottom: 14,
+              right: 52,
+            }}>
+              <Text style={{ color: '#F08080', fontSize: 12 }}>listening...</Text>
+            </Animated.View>
+          )}
         </View>}
 
         {/* Severity scale */}

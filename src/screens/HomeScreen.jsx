@@ -15,7 +15,7 @@ import { getEntryIndex, getPeriodStarts, getPeriodEnds, addPeriodStart, addPerio
 import { groupByCycle, estimateCycleDay, getCurrentPeriodStatus } from '../lib/cycles';
 import { detectPattern } from '../lib/patternAlert';
 
-const PX = 20; // consistent horizontal padding
+const PX = 20;
 
 function severityColor(n) {
   if (n <= 3) return '#FBC4AB';
@@ -24,32 +24,19 @@ function severityColor(n) {
   return '#D45D5D';
 }
 
-/** Group entries by calendar date (YYYY-MM-DD), newest date first. */
-function groupByDate(entries) {
-  const sorted = [...entries].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  const groups = [];
-  let current = null;
+const MISSED_KEYWORDS = ['missed', 'cancel', 'stayed home', 'stayed in bed', "couldn't", 'called in sick', 'couldn\'t make'];
 
-  for (const entry of sorted) {
-    const dateKey = new Date(entry.timestamp).toLocaleDateString('en-CA'); // YYYY-MM-DD
-    if (!current || current.dateKey !== dateKey) {
-      current = { dateKey, entries: [] };
-      groups.push(current);
-    }
-    current.entries.push(entry);
-  }
-  return groups;
-}
+function computeCycleStats(cycle, isCurrentCycle) {
+  const { entries, startDate } = cycle;
+  const month = new Date(startDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'long' });
+  const severeDays = entries.filter(e => e.severity >= 7).length;
+  const missedDays = entries.filter(e => {
+    const answer = (e.followUp?.answer || '').toLowerCase();
+    return MISSED_KEYWORDS.some(kw => answer.includes(kw));
+  }).length;
+  const hasMidCyclePain = entries.some(e => e.cycleDay != null && e.cycleDay >= 8 && e.severity >= 4);
 
-function formatDateLabel(dateKey) {
-  const d = new Date(dateKey + 'T12:00:00');
-  const now = new Date();
-  const today = now.toLocaleDateString('en-CA');
-  const yesterday = new Date(now - 86400000).toLocaleDateString('en-CA');
-
-  if (dateKey === today) return 'today';
-  if (dateKey === yesterday) return 'yesterday';
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return { month, severeDays, missedDays, hasMidCyclePain, entryCount: entries.length, startDate, isCurrentCycle };
 }
 
 function getGreeting() {
@@ -59,25 +46,102 @@ function getGreeting() {
   return 'good evening';
 }
 
+function CycleCard({ stats }) {
+  const { month, severeDays, missedDays, hasMidCyclePain, isCurrentCycle } = stats;
+  const accent = isCurrentCycle ? '#F08080' : '#2D1520';
+
+  return (
+    <View style={{
+      backgroundColor: '#FFFFFF',
+      borderRadius: 14,
+      padding: 14,
+      marginRight: 12,
+      width: 180,
+      borderWidth: isCurrentCycle ? 1 : 0.5,
+      borderColor: isCurrentCycle ? '#F0D0D0' : '#F0E0E0',
+    }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+        <Text style={{ color: '#2D1520', fontSize: 13, fontWeight: '600' }}>{month}</Text>
+        {isCurrentCycle && (
+          <View style={{ marginLeft: 6, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: '#FFF1ED', borderRadius: 4 }}>
+            <Text style={{ color: '#F08080', fontSize: 10, fontWeight: '600' }}>Current</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Dot matrix */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 3, marginBottom: 12 }}>
+        {stats.dots.map((dot, i) => (
+          <View key={i} style={{
+            width: 7, height: 7, borderRadius: 3.5,
+            backgroundColor: dot.color,
+          }} />
+        ))}
+      </View>
+
+      {/* Stats */}
+      <View style={{ gap: 6 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <Text style={{ color: '#A8969F', fontSize: 11 }}>Severe days</Text>
+          <Text style={{ color: accent, fontSize: 11, fontWeight: '600' }}>
+            {severeDays}{isCurrentCycle ? ' so far' : ''}
+          </Text>
+        </View>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <Text style={{ color: '#A8969F', fontSize: 11 }}>Missed activity</Text>
+          <Text style={{ color: accent, fontSize: 11, fontWeight: '600' }}>
+            {missedDays > 0 ? `${missedDays} day${missedDays > 1 ? 's' : ''}` : (isCurrentCycle ? 'None yet' : 'None')}
+          </Text>
+        </View>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <Text style={{ color: '#A8969F', fontSize: 11 }}>Mid-cycle pain</Text>
+          <Text style={{ color: accent, fontSize: 11, fontWeight: '600' }}>
+            {hasMidCyclePain ? 'Yes' : (isCurrentCycle ? 'Not yet logged' : 'No')}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function buildDots(entries) {
+  // One dot per entry, colored by severity. Gray dots for gaps.
+  const sorted = [...entries].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const dots = [];
+  let lastDay = 0;
+  for (const entry of sorted) {
+    const day = entry.cycleDay || 0;
+    // Fill gray dots for gap days
+    for (let d = lastDay + 1; d < day; d++) {
+      dots.push({ color: '#E8E0E4' });
+    }
+    dots.push({ color: severityColor(entry.severity) });
+    lastDay = day;
+  }
+  return dots;
+}
+
 export default function HomeScreen() {
   const navigation = useNavigation();
   const [cycleDay, setCycleDay] = useState(null);
   const [periodStatus, setPeriodStatus] = useState({ active: false, startDate: null });
   const [entries, setEntries] = useState([]);
+  const [periodStarts, setPeriodStarts] = useState([]);
   const [pattern, setPattern] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
-      const [allEntries, periodStarts, periodEnds] = await Promise.all([
+      const [allEntries, starts, periodEnds] = await Promise.all([
         getEntryIndex(),
         getPeriodStarts(),
         getPeriodEnds(),
       ]);
-      setCycleDay(estimateCycleDay(periodStarts));
-      setPeriodStatus(getCurrentPeriodStatus(periodStarts, periodEnds));
+      setCycleDay(estimateCycleDay(starts));
+      setPeriodStatus(getCurrentPeriodStatus(starts, periodEnds));
+      setPeriodStarts(starts);
       setEntries(allEntries);
-      setPattern(detectPattern(allEntries, periodStarts));
+      setPattern(detectPattern(allEntries, starts));
     } catch (error) {
       console.error('Error loading home data:', error);
     } finally {
@@ -91,7 +155,22 @@ export default function HomeScreen() {
     return unsub;
   }, [navigation, loadData]);
 
-  const dateGroups = useMemo(() => groupByDate(entries).slice(0, 5), [entries]);
+  const cycleGroups = useMemo(() => {
+    const groups = groupByCycle(entries, periodStarts);
+    return groups.map((cycle, i) => {
+      const stats = computeCycleStats(cycle, i === 0);
+      stats.dots = buildDots(cycle.entries);
+      return stats;
+    });
+  }, [entries, periodStarts]);
+
+  const dateRange = useMemo(() => {
+    if (cycleGroups.length === 0) return '';
+    const months = cycleGroups.map(c => c.month);
+    const first = months[months.length - 1];
+    const last = months[0];
+    return first === last ? first : `${first} -- ${last}`;
+  }, [cycleGroups]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFF8F6' }}>
@@ -188,96 +267,60 @@ export default function HomeScreen() {
           }}
         >
           <Text style={{ color: '#2D1520', fontSize: 16 }}>
-            {getGreeting()} — how are you doing?
+            {getGreeting()} -- how are you doing?
           </Text>
           <Text style={{ color: '#A8969F', fontSize: 13, marginTop: 5 }}>
             take a moment to check in
           </Text>
         </TouchableOpacity>
 
-        {/* Pattern alert card */}
-        {pattern && (
-          <View style={{
-            marginHorizontal: PX,
-            marginTop: 12,
-            padding: 16,
-            backgroundColor: '#FFF5F5',
-            borderRadius: 16,
-            borderWidth: 1,
-            borderColor: '#F0D0D0',
-          }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-              <View style={{
-                paddingHorizontal: 8,
-                paddingVertical: 3,
-                backgroundColor: '#F08080',
-                borderRadius: 6,
-                marginRight: 8,
-              }}>
-                <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '600', letterSpacing: 0.4 }}>
-                  {pattern.label.toUpperCase()}
+        {/* Cycle dashboard */}
+        {cycleGroups.length > 0 ? (
+          <View style={{ marginTop: 28 }}>
+            {/* Dashboard header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: PX, marginBottom: 14 }}>
+              <View>
+                <Text style={{ color: '#2D1520', fontSize: 16, fontWeight: '600' }}>
+                  {cycleGroups.length} cycle{cycleGroups.length > 1 ? 's' : ''} logged
+                </Text>
+                <Text style={{ color: '#A8969F', fontSize: 12, marginTop: 2 }}>
+                  {dateRange}
                 </Text>
               </View>
+              {pattern && (
+                <View style={{ paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#FFF5F5', borderRadius: 6, borderWidth: 0.5, borderColor: '#F0D0D0' }}>
+                  <Text style={{ color: '#F08080', fontSize: 11, fontWeight: '600' }}>
+                    {pattern.label}
+                  </Text>
+                </View>
+              )}
             </View>
-            <Text style={{ color: '#2D1520', fontSize: 14, lineHeight: 20 }}>
-              {pattern.message}
-            </Text>
-          </View>
-        )}
 
-        {/* Recent entries grouped by date */}
-        {dateGroups.length > 0 ? (
-          <View style={{ paddingHorizontal: PX, marginTop: 28 }}>
-            <Text style={{ color: '#A8969F', fontSize: 11, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 16 }}>
-              recent
-            </Text>
+            {/* Cycle cards - horizontal scroll */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: PX }}
+            >
+              {cycleGroups.map((stats, i) => (
+                <CycleCard key={stats.startDate} stats={stats} />
+              ))}
+            </ScrollView>
 
-            {dateGroups.map((group, gi) => (
-              <View key={group.dateKey} style={gi > 0 ? { marginTop: 16 } : undefined}>
-                {/* Date label */}
-                <Text style={{ color: '#A8969F', fontSize: 12, marginBottom: 6 }}>
-                  {formatDateLabel(group.dateKey)}
+            {/* Pattern detail */}
+            {pattern && (
+              <View style={{ paddingHorizontal: PX, marginTop: 16 }}>
+                <Text style={{ color: '#A8969F', fontSize: 12, lineHeight: 18 }}>
+                  {pattern.message}
                 </Text>
-
-                {/* Entries for that day — flat rows */}
-                {group.entries.map((entry) => (
-                  <View
-                    key={entry.id}
-                    style={{
-                      paddingVertical: 10,
-                      flexDirection: 'row',
-                      alignItems: 'flex-start',
-                    }}
-                  >
-                    <View
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: 4,
-                        backgroundColor: severityColor(entry.severity),
-                        marginTop: 5,
-                        marginRight: 10,
-                      }}
-                    />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: '#2D1520', fontSize: 14, lineHeight: 19 }} numberOfLines={2}>
-                        {entry.text}
-                      </Text>
-                      <Text style={{ color: '#A8969F', fontSize: 12, marginTop: 3 }}>
-                        {entry.severity}/10
-                        {entry.followUp?.answer ? ` · ${entry.followUp.answer}` : ''}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
               </View>
-            ))}
+            )}
 
-            {/* Appointment prep — inline link, not a card */}
+            {/* Appointment prep link */}
             <TouchableOpacity
               activeOpacity={0.6}
               onPress={() => navigation.navigate('Prep')}
-              style={{ marginTop: 24, paddingVertical: 8 }}
+              style={{ paddingHorizontal: PX, marginTop: 20, paddingVertical: 8 }}
             >
               <Text style={{ color: '#A8969F', fontSize: 13 }}>
                 seeing your doctor soon?{' '}
