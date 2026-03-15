@@ -4,6 +4,7 @@ import { ChevronLeft } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { seedData } from '../lib/seedData';
 import { clearAllData } from '../lib/storage';
+import { clearPatientEntries } from '../lib/moorcheh';
 
 export default function SettingsScreen() {
   const navigation = useNavigation();
@@ -12,7 +13,7 @@ export default function SettingsScreen() {
   const handleSeedData = async () => {
     setLoading(true);
     try {
-      await seedData(false);
+      await seedData(true);
       Alert.alert('Done', 'Seeded 12 entries across 3 cycles');
     } catch (error) {
       Alert.alert('Error', error.message);
@@ -37,7 +38,12 @@ export default function SettingsScreen() {
     if (confirmed) {
       setLoading(true);
       try {
-        await clearAllData();
+        await Promise.all([
+          clearAllData(),
+          clearPatientEntries().catch((err) =>
+            console.warn('Moorcheh clear failed (non-critical):', err.message)
+          ),
+        ]);
         if (Platform.OS === 'web') window.alert('All data deleted');
         else Alert.alert('Cleared', 'All data deleted');
       } catch (error) {

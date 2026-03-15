@@ -132,6 +132,30 @@ export async function answerWithClinicalContext(question) {
 }
 
 /**
+ * Delete specific documents from the patient entries namespace by ID.
+ * @param {string[]} ids - Document IDs to delete (max 1000)
+ */
+export async function deleteEntries(ids) {
+  if (!ids.length) return;
+  return moorchehFetch(`/namespaces/${NAMESPACE}/documents/delete`, { ids });
+}
+
+/**
+ * Clear all patient entries from Moorcheh.
+ * Fetches all entry IDs via search, then deletes them in batches.
+ */
+export async function clearPatientEntries() {
+  const key = getApiKey();
+  if (!key) return; // no-op if Moorcheh not configured
+
+  const results = await queryEntries("symptom entry", 1000);
+  if (!results.length) return;
+
+  const ids = results.map((r) => r.id);
+  await deleteEntries(ids);
+}
+
+/**
  * One-time upload of clinical guideline documents to the guidelines namespace.
  * Run once at setup — not called during normal app usage.
  */

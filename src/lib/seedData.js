@@ -207,10 +207,10 @@ export async function seedData(uploadToMoorcheh = false) {
       try {
         const moorchehText = buildMoorchehText(entry);
         await uploadEntry(moorchehText, {
-          entry_id: entry.id,
+          entryId: entry.id,
           timestamp: entry.timestamp,
           severity: entry.severity,
-          cycle_day: entry.cycleDay || 0,
+          cycleDay: entry.cycleDay || 0,
         });
       } catch (err) {
         console.warn(`Moorcheh upload failed for ${entry.id}:`, err.message);
