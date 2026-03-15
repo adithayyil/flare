@@ -62,17 +62,20 @@ function getGreeting() {
 export default function HomeScreen() {
   const navigation = useNavigation();
   const [cycleDay, setCycleDay] = useState(null);
+  const [periodStatus, setPeriodStatus] = useState({ active: false, startDate: null });
   const [entries, setEntries] = useState([]);
   const [pattern, setPattern] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = async () => {
     try {
-      const [allEntries, periodStarts] = await Promise.all([
+      const [allEntries, periodStarts, periodEnds] = await Promise.all([
         getEntryIndex(),
         getPeriodStarts(),
+        getPeriodEnds(),
       ]);
       setCycleDay(estimateCycleDay(periodStarts));
+      setPeriodStatus(getCurrentPeriodStatus(periodStarts, periodEnds));
       setEntries(allEntries);
       setPattern(detectPattern(allEntries, periodStarts));
     } catch (error) {
@@ -106,33 +109,56 @@ export default function HomeScreen() {
             {cycleDay && (
               <Text style={{ color: '#A8969F', fontSize: 13, marginTop: 2 }}>
                 cycle day {cycleDay}
+                {periodStatus.active && periodStatus.startDate
+                  ? ` · period day ${Math.floor((new Date(new Date().toLocaleDateString('en-CA')) - new Date(periodStatus.startDate)) / (1000 * 60 * 60 * 24)) + 1}`
+                  : ''}
               </Text>
             )}
             <TouchableOpacity
               activeOpacity={0.6}
               onPress={async () => {
-                const confirmed = Platform.OS === 'web'
-                  ? window.confirm('mark today as a new period start?')
-                  : await new Promise((resolve) =>
-                      Alert.alert(
-                        'period started?',
-                        'mark today as a new period start?',
-                        [
-                          { text: 'cancel', onPress: () => resolve(false), style: 'cancel' },
-                          { text: 'yes', onPress: () => resolve(true) },
-                        ],
-                      ),
-                    );
-                if (confirmed) {
-                  const todayISO = new Date().toLocaleDateString('en-CA');
-                  await addPeriodStart(todayISO);
-                  loadData();
+                if (periodStatus.active) {
+                  const confirmed = Platform.OS === 'web'
+                    ? window.confirm('mark today as period ended?')
+                    : await new Promise((resolve) =>
+                        Alert.alert(
+                          'period ended?',
+                          'mark today as the last day of this period?',
+                          [
+                            { text: 'cancel', onPress: () => resolve(false), style: 'cancel' },
+                            { text: 'yes', onPress: () => resolve(true) },
+                          ],
+                        ),
+                      );
+                  if (confirmed) {
+                    const todayISO = new Date().toLocaleDateString('en-CA');
+                    await addPeriodEnd(todayISO);
+                    loadData();
+                  }
+                } else {
+                  const confirmed = Platform.OS === 'web'
+                    ? window.confirm('mark today as a new period start?')
+                    : await new Promise((resolve) =>
+                        Alert.alert(
+                          'period started?',
+                          'mark today as a new period start?',
+                          [
+                            { text: 'cancel', onPress: () => resolve(false), style: 'cancel' },
+                            { text: 'yes', onPress: () => resolve(true) },
+                          ],
+                        ),
+                      );
+                  if (confirmed) {
+                    const todayISO = new Date().toLocaleDateString('en-CA');
+                    await addPeriodStart(todayISO);
+                    loadData();
+                  }
                 }
               }}
               style={{ marginTop: 4 }}
             >
               <Text style={{ color: '#A8969F', fontSize: 12 }}>
-                period started?
+                {periodStatus.active ? 'period ended?' : 'period started?'}
               </Text>
             </TouchableOpacity>
           </View>

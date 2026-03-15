@@ -4,6 +4,7 @@ import * as SecureStore from "expo-secure-store";
 const KEYS = {
   ENTRY_INDEX: "flare:entry_index",
   PERIOD_STARTS: "flare:period_starts",
+  PERIOD_ENDS: "flare:period_ends",
   ONBOARDING_DONE: "flare:onboarding_done",
 };
 
@@ -43,6 +44,25 @@ export async function addPeriodStart(dateStr) {
     starts.push(dateStr);
     starts.sort();
     await AsyncStorage.setItem(KEYS.PERIOD_STARTS, JSON.stringify(starts));
+  }
+}
+
+export async function getPeriodEnds() {
+  const raw = await AsyncStorage.getItem(KEYS.PERIOD_ENDS);
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+export async function addPeriodEnd(dateStr) {
+  const ends = await getPeriodEnds();
+  if (!ends.includes(dateStr)) {
+    ends.push(dateStr);
+    ends.sort();
+    await AsyncStorage.setItem(KEYS.PERIOD_ENDS, JSON.stringify(ends));
   }
 }
 
@@ -109,5 +129,6 @@ export async function clearAllData() {
 export async function exportData() {
   const entryIndex = await getEntryIndex();
   const periodStarts = await getPeriodStarts();
-  return JSON.stringify({ entryIndex, periodStarts }, null, 2);
+  const periodEnds = await getPeriodEnds();
+  return JSON.stringify({ entryIndex, periodStarts, periodEnds }, null, 2);
 }
