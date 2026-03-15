@@ -1,7 +1,7 @@
 /**
  * Seed data for development/demo.
  * Populates AsyncStorage local index and optionally uploads to Moorcheh.
- * Run once to get testable data across 3 cycles.
+ * 3 cycles with realistic endo-pattern entries and structured follow-ups.
  */
 import { appendEntryIndex, addPeriodStart, getEntryIndex } from "./storage";
 import { uploadEntry } from "./moorcheh";
@@ -9,96 +9,154 @@ import { uploadEntry } from "./moorcheh";
 const SEED_PERIOD_STARTS = ["2026-01-10", "2026-02-08", "2026-03-09"];
 
 const SEED_ENTRIES = [
-  // Cycle 1 (Jan 10)
+  // ── Cycle 1 (Jan 10) ──
   {
     id: "e_seed_01",
     timestamp: "2026-01-10T08:00:00.000Z",
     severity: 7,
     cycleDay: 1,
-    text: "On 2026-01-10 (cycle day 1), severity 7/10: Awful cramps started this morning, had to call in sick to work. Heating pad is barely helping.",
+    text: "awful cramps started this morning, had to call in sick. heating pad barely helping",
+    followUp: {
+      question: "how did this affect your plans for today?",
+      answer: "called in sick to work",
+    },
   },
   {
     id: "e_seed_02",
     timestamp: "2026-01-11T14:00:00.000Z",
     severity: 8,
     cycleDay: 2,
-    text: "On 2026-01-11 (cycle day 2), severity 8/10: Even worse today. Can't get out of bed, missed work again. Nausea and back pain too. [Follow-up — How many days missed this cycle? Two days so far]",
+    text: "worse than yesterday. can't get out of bed, nausea and back pain on top of cramps",
+    followUp: {
+      question: "what did you have to miss or cancel?",
+      answer: "missed work again, second day in a row",
+    },
   },
   {
     id: "e_seed_03",
     timestamp: "2026-01-13T10:00:00.000Z",
     severity: 4,
     cycleDay: 4,
-    text: "On 2026-01-13 (cycle day 4), severity 4/10: Pain easing up, manageable with ibuprofen. Still some lower back ache.",
+    text: "pain easing up, manageable with ibuprofen. still some lower back ache but i can function",
+    followUp: null,
   },
   {
     id: "e_seed_04",
     timestamp: "2026-01-22T18:00:00.000Z",
     severity: 5,
     cycleDay: 13,
-    text: "On 2026-01-22 (cycle day 13), severity 5/10: Sharp pelvic pain on the right side, not during my period. Feels different from cramps. [Follow-up — Is this mid-cycle pain new? Happens most cycles actually]",
+    text: "sharp pelvic pain on the right side, not during my period. feels different from cramps",
+    followUp: {
+      question: "is this type of mid-cycle pain new for you?",
+      answer: "happens most cycles actually",
+    },
   },
 
-  // Cycle 2 (Feb 8)
+  // ── Cycle 2 (Feb 8) ──
   {
     id: "e_seed_05",
     timestamp: "2026-02-08T09:00:00.000Z",
     severity: 8,
     cycleDay: 1,
-    text: "On 2026-02-08 (cycle day 1), severity 8/10: Period started and the cramps are terrible. Missed my morning classes. Doubled over in pain.",
+    text: "period started and the cramps are terrible. doubled over, couldn't make it to class",
+    followUp: {
+      question: "what did you have to miss or cancel?",
+      answer: "missed morning classes",
+    },
   },
   {
     id: "e_seed_06",
     timestamp: "2026-02-09T11:00:00.000Z",
     severity: 7,
     cycleDay: 2,
-    text: "On 2026-02-09 (cycle day 2), severity 7/10: Still really bad. Heavy bleeding, soaked through in an hour. Stayed home again. [Follow-up — How many days missed? This is the second day I've missed class]",
+    text: "still really bad. heavy bleeding, soaked through in an hour. staying home again",
+    followUp: {
+      question: "how many days have you missed so far this cycle?",
+      answer: "second day i've missed class",
+    },
   },
   {
     id: "e_seed_07",
     timestamp: "2026-02-10T16:00:00.000Z",
     severity: 5,
     cycleDay: 3,
-    text: "On 2026-02-10 (cycle day 3), severity 5/10: Getting better but exhausted. Managed to go to afternoon class but left early.",
+    text: "getting better but exhausted. went to afternoon class but left early",
+    followUp: {
+      question: "were you able to get through your plans today?",
+      answer: "left class early, couldn't focus",
+    },
   },
   {
     id: "e_seed_08",
     timestamp: "2026-02-21T20:00:00.000Z",
     severity: 6,
     cycleDay: 14,
-    text: "On 2026-02-21 (cycle day 14), severity 6/10: That mid-cycle pain again, same right-sided pelvic pain. Had to cancel dinner plans. [Follow-up — Is this recurring? Yes, same thing last month around the same time]",
+    text: "that mid-cycle pain again, same right-sided pelvic pain as last month",
+    followUp: {
+      question: "did this disrupt anything you had planned?",
+      answer: "had to cancel dinner plans",
+    },
   },
   {
     id: "e_seed_09",
     timestamp: "2026-02-25T12:00:00.000Z",
     severity: 3,
     cycleDay: 18,
-    text: "On 2026-02-25 (cycle day 18), severity 3/10: Pain during sex last night, a dull deep ache. It's happened a few times now.",
+    text: "pain during sex last night, a dull deep ache. it's happened a few times now",
+    followUp: {
+      question: "has this been affecting your comfort or intimacy?",
+      answer: "yeah it's starting to make me avoid it",
+    },
   },
 
-  // Cycle 3 (Mar 9)
+  // ── Cycle 3 (Mar 9) ──
   {
     id: "e_seed_10",
     timestamp: "2026-03-09T07:30:00.000Z",
     severity: 9,
     cycleDay: 1,
-    text: "On 2026-03-09 (cycle day 1), severity 9/10: Worst period yet. Woke up at 5am in pain, threw up from the intensity. Can't do anything today.",
+    text: "worst period yet. woke up at 5am in pain, threw up from the intensity",
+    followUp: {
+      question: "what were you unable to do today?",
+      answer: "couldn't do anything, stayed in bed all day",
+    },
   },
   {
     id: "e_seed_11",
     timestamp: "2026-03-10T10:00:00.000Z",
     severity: 8,
     cycleDay: 2,
-    text: "On 2026-03-10 (cycle day 2), severity 8/10: Still terrible. Missed work, third cycle in a row where I've lost days. Diarrhea and bloating too. [Follow-up — How many days missed total? At least 2 days every single cycle for months now]",
+    text: "still terrible. diarrhea and bloating on top of cramps. third cycle in a row losing days to this",
+    followUp: {
+      question: "how many days have you missed across recent cycles?",
+      answer: "at least 2 days every single cycle for months",
+    },
   },
   {
     id: "e_seed_12",
     timestamp: "2026-03-12T15:00:00.000Z",
     severity: 5,
     cycleDay: 4,
-    text: "On 2026-03-12 (cycle day 4), severity 5/10: Easing off. Back at work but struggling to concentrate. Fatigue is real.",
+    text: "easing off finally. back at work but struggling to concentrate, totally wiped out",
+    followUp: {
+      question: "were you able to get through your day?",
+      answer: "got through it but barely, fatigue is brutal",
+    },
   },
 ];
+
+/**
+ * Build Moorcheh-formatted text from an entry (mirrors useJournalFlow logic).
+ */
+function buildMoorchehText(entry) {
+  const date = new Date(entry.timestamp).toLocaleDateString("en-CA");
+  const cycleDayStr = entry.cycleDay ? ` (cycle day ${entry.cycleDay})` : "";
+  let text = `On ${date}${cycleDayStr}, severity ${entry.severity}/10: ${entry.text}`;
+  if (entry.followUp?.question && entry.followUp?.answer) {
+    text += ` [Follow-up: ${entry.followUp.question} ${entry.followUp.answer}]`;
+  }
+  return text;
+}
 
 /**
  * Seed local index + period starts. Call once on dev/demo setup.
@@ -107,7 +165,7 @@ const SEED_ENTRIES = [
 export async function seedData(uploadToMoorcheh = false) {
   const existing = await getEntryIndex();
   if (existing.length > 0) {
-    console.log("Seed data skipped — entries already exist");
+    console.log("Seed data skipped, entries already exist");
     return;
   }
 
@@ -123,14 +181,18 @@ export async function seedData(uploadToMoorcheh = false) {
       timestamp: entry.timestamp,
       severity: entry.severity,
       cycleDay: entry.cycleDay,
+      text: entry.text,
+      followUp: entry.followUp,
     });
 
     if (uploadToMoorcheh) {
       try {
-        await uploadEntry(entry.text, {
+        const moorchehText = buildMoorchehText(entry);
+        await uploadEntry(moorchehText, {
+          entry_id: entry.id,
           timestamp: entry.timestamp,
           severity: entry.severity,
-          cycleDay: entry.cycleDay,
+          cycle_day: entry.cycleDay || 0,
         });
       } catch (err) {
         console.warn(`Moorcheh upload failed for ${entry.id}:`, err.message);
@@ -138,5 +200,7 @@ export async function seedData(uploadToMoorcheh = false) {
     }
   }
 
-  console.log(`Seeded ${SEED_ENTRIES.length} entries across ${SEED_PERIOD_STARTS.length} cycles`);
+  console.log(
+    `Seeded ${SEED_ENTRIES.length} entries across ${SEED_PERIOD_STARTS.length} cycles`
+  );
 }
