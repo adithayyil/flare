@@ -86,16 +86,15 @@ Return ONLY: { "whyItMatters": "...", "script": "...", "ifStillDismissed": "..."
   const missedStat = patientSummary.keyNumbers?.find(k =>
     k.label.toLowerCase().includes('missed')
   );
-  const midCycleFinding = patternResult.findings?.find(f =>
-    f.pattern.toLowerCase().includes('non-menstrual') ||
-    f.pattern.toLowerCase().includes('mid-cycle')
-  );
+  const midCycleCount = cycleGroups.filter(c =>
+    c.entries.some(e => e.cycleDay >= 8 && e.severity >= 4)
+  ).length;
 
   const stats = [
     { value: String(cycleGroups.length), label: 'cycles logged', detail: null },
     { value: String(severeDays), label: 'severe days total', detail: null },
     { value: missedStat?.value ?? '—', label: 'missed commitments', detail: missedStat?.detail ?? null },
-    { value: cycleGroups.length >= 2 ? `${midCycleFinding ? midCycleFinding.cyclesPresent : 0}/${cycleGroups.length}` : '—', label: 'cycles w/ mid-cycle pain', detail: null },
+    { value: cycleGroups.length >= 2 ? `${midCycleCount}/${cycleGroups.length}` : '—', label: 'cycles w/ mid-cycle pain', detail: null },
   ];
 
   // Date range label
