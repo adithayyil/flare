@@ -128,10 +128,10 @@ export function useJournalFlow() {
     try {
       const moorchehText = buildMoorchehText(entry);
       const metadata = {
-        entry_id: entry.id,
+        entryId: entry.id,
         timestamp: entry.timestamp,
         severity: entry.severity,
-        cycle_day: entry.cycleDay || 0,
+        cycleDay: entry.cycleDay || 0,
       };
 
       await Promise.all([

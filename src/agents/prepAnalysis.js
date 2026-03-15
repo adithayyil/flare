@@ -105,8 +105,8 @@ export async function runPrepAnalysis(retrievedEntries, cycleGroups, moorchehSum
     const turn1UserMessage = JSON.stringify({
       retrievedEntries: retrievedEntries.map((e) => ({
         text: e.text,
-        severity: e.metadata?.severity ?? e.severity,
-        cycleDay: e.metadata?.cycleDay ?? e.cycleDay,
+        severity: e.metadata?.severity ?? e.severity ?? 0,
+        cycleDay: e.metadata?.cycleDay ?? e.metadata?.cycle_day ?? e.cycleDay ?? 0,
         timestamp: e.metadata?.timestamp ?? e.timestamp,
         score: e.score,
       })),

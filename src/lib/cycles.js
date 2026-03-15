@@ -25,12 +25,12 @@ export function groupByCycle(entries, periodStarts) {
   const cycles = new Map();
 
   for (const entry of sorted) {
-    const entryDate = new Date(entry.timestamp);
+    const entryDateStr = new Date(entry.timestamp).toLocaleDateString('en-CA');
     let assignedStart = null;
 
-    // Find most recent periodStart <= entry timestamp
+    // Find most recent periodStart <= entry date
     for (let i = starts.length - 1; i >= 0; i--) {
-      if (new Date(starts[i]) <= entryDate) {
+      if (starts[i] <= entryDateStr) {
         assignedStart = starts[i];
         break;
       }
@@ -93,14 +93,14 @@ function clusterByWindow(sortedEntries, maxDays) {
 export function estimateCycleDay(periodStarts) {
   if (!periodStarts.length) return null;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const todayStr = new Date().toLocaleDateString('en-CA');
+  const today = new Date(todayStr + 'T00:00:00');
 
   const sorted = [...periodStarts].sort();
   let mostRecent = null;
 
   for (let i = sorted.length - 1; i >= 0; i--) {
-    if (new Date(sorted[i]) <= today) {
+    if (sorted[i] <= todayStr) {
       mostRecent = sorted[i];
       break;
     }
@@ -108,7 +108,7 @@ export function estimateCycleDay(periodStarts) {
 
   if (!mostRecent) return null;
 
-  const diffMs = today - new Date(mostRecent);
+  const diffMs = today - new Date(mostRecent + 'T00:00:00');
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   return diffDays + 1;
 }
