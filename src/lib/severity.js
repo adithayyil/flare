@@ -43,16 +43,3 @@ export const MANKOSKI_SCALE = [
 ];
 
 export const SEVERITY_OPTIONS = MANKOSKI_SCALE;
-
-/**
- * Build the text blob that gets uploaded to Moorcheh.
- */
-export function buildMoorchehText(rawText, severity, cycleDay, followUp) {
-  const date = new Date().toISOString().split("T")[0];
-  const cyclePart = cycleDay != null ? ` (cycle day ${cycleDay})` : "";
-  let text = `On ${date}${cyclePart}, severity ${severity}/10: ${rawText}`;
-  if (followUp) {
-    text += ` [Follow-up — ${followUp.question} ${followUp.response}]`;
-  }
-  return text;
-}

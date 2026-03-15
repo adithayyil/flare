@@ -5,7 +5,6 @@ import {
   Text,
   TouchableOpacity,
   Platform,
-  TextInput,
 } from 'react-native';
 import { addPeriodStart, setOnboardingDone } from '../lib/storage';
 

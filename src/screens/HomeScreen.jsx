@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -91,7 +91,7 @@ export default function HomeScreen() {
     return unsub;
   }, [navigation, loadData]);
 
-  const dateGroups = groupByDate(entries).slice(0, 5); // last 5 days max
+  const dateGroups = useMemo(() => groupByDate(entries).slice(0, 5), [entries]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFF8F6' }}>

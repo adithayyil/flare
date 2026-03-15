@@ -48,17 +48,16 @@ export default function JournalScreen() {
     isSaved,
   } = useJournalFlow();
 
-  const showSeverity = symptomText.trim().length > 5 && severity === null;
   const showConversation = severity !== null;
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      className="flex-1 bg-bg"
+      style={{ flex: 1, backgroundColor: '#FFF8F6' }}
       keyboardVerticalOffset={90}
     >
       <ScrollView
-        className="flex-1"
+        style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 60, paddingBottom: 40 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -95,7 +94,7 @@ export default function JournalScreen() {
         </View>}
 
         {/* Severity scale */}
-        {showSeverity && (
+        {symptomText.trim().length > 5 && severity === null && (
           <Animated.View entering={FadeIn.duration(200)}>
             <BubbleQuestion>how severe? tap a number.</BubbleQuestion>
 
