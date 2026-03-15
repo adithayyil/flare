@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Settings, ChevronRight } from 'lucide-react-native';
+import InfoTip from '../components/InfoTip';
 import { getEntryIndex, getPeriodStarts, getPeriodEnds, addPeriodStart, addPeriodEnd } from '../lib/storage';
 import { groupByCycle, estimateCycleDay, getCurrentPeriodStatus } from '../lib/cycles';
 import { detectPattern } from '../lib/patternAlert';
@@ -71,13 +72,40 @@ function CycleCard({ stats }) {
       </View>
 
       {/* Dot matrix */}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 3, marginBottom: 12 }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 3, marginBottom: 12, alignItems: 'center' }}>
         {stats.dots.map((dot, i) => (
           <View key={i} style={{
             width: 7, height: 7, borderRadius: 3.5,
             backgroundColor: dot.color,
           }} />
         ))}
+        <InfoTip title="dot matrix" style={{ marginLeft: 2 }}>
+          <Text style={{ color: '#2D1520', fontSize: 14, lineHeight: 21, marginBottom: 8 }}>
+            Each dot is one journal entry. Color shows severity level:
+          </Text>
+          <View style={{ gap: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#FBC4AB' }} />
+              <Text style={{ color: '#2D1520', fontSize: 13 }}>1-3 mild</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#F4978E' }} />
+              <Text style={{ color: '#2D1520', fontSize: 13 }}>4-6 moderate</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#F08080' }} />
+              <Text style={{ color: '#2D1520', fontSize: 13 }}>7-9 severe</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#D45D5D' }} />
+              <Text style={{ color: '#2D1520', fontSize: 13 }}>10 emergency</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#E8E0E4' }} />
+              <Text style={{ color: '#2D1520', fontSize: 13 }}>gap day (no entry)</Text>
+            </View>
+          </View>
+        </InfoTip>
       </View>
 
       {/* Stats */}
@@ -187,16 +215,24 @@ export default function HomeScreen() {
           <View>
             <Text style={{ color: '#2D1520', fontSize: 22, fontWeight: '600' }}>❉ flare</Text>
             {cycleDay && (
-              <Text style={{ color: '#A8969F', fontSize: 13, marginTop: 2 }}>
-                cycle day {cycleDay}
-                {periodStatus.active && periodStatus.startDate
-                  ? (() => {
-                      const days = Math.floor((new Date(new Date().toLocaleDateString('en-CA')) - new Date(periodStatus.startDate)) / (1000 * 60 * 60 * 24)) + 1;
-                      return Number.isFinite(days) && days > 0 ? ` · period day ${days}` : '';
-                    })()
-                  : ''}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 5 }}>
+                <Text style={{ color: '#A8969F', fontSize: 13 }}>
+                  cycle day {cycleDay}
+                  {periodStatus.active && periodStatus.startDate
+                    ? (() => {
+                        const days = Math.floor((new Date(new Date().toLocaleDateString('en-CA')) - new Date(periodStatus.startDate)) / (1000 * 60 * 60 * 24)) + 1;
+                        return Number.isFinite(days) && days > 0 ? ` · period day ${days}` : '';
+                      })()
+                    : ''}
+                </Text>
+                <InfoTip title="cycle day">
+                  <Text style={{ color: '#2D1520', fontSize: 14, lineHeight: 21 }}>
+                    Days since your last period started. Resets to day 1 each time you mark a new period.
+                  </Text>
+                </InfoTip>
+              </View>
             )}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
             <TouchableOpacity
               activeOpacity={0.6}
               onPress={async () => {
@@ -239,7 +275,6 @@ export default function HomeScreen() {
                 }
               }}
               style={{
-                marginTop: 6,
                 alignSelf: 'flex-start',
                 paddingHorizontal: 10,
                 paddingVertical: 5,
@@ -253,6 +288,12 @@ export default function HomeScreen() {
                 {periodStatus.active ? 'period ended?' : 'period started?'}
               </Text>
             </TouchableOpacity>
+            <InfoTip title="period tracking">
+              <Text style={{ color: '#2D1520', fontSize: 14, lineHeight: 21 }}>
+                Marking when your period starts and ends helps track cycle length and spot patterns over time.
+              </Text>
+            </InfoTip>
+            </View>
           </View>
           <TouchableOpacity
             onPress={() => navigation.navigate('Settings')}
@@ -274,6 +315,8 @@ export default function HomeScreen() {
             paddingHorizontal: 20,
             backgroundColor: '#FFF1ED',
             borderRadius: 16,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: '#F0D0D0',
             flexDirection: 'row',
             alignItems: 'center',
           }}
@@ -283,7 +326,7 @@ export default function HomeScreen() {
               {getGreeting()} {'\u2013'} how are you doing?
             </Text>
             <Text style={{ color: '#A8969F', fontSize: 13, marginTop: 5 }}>
-              take a moment to check in
+              tap to log how you're feeling
             </Text>
           </View>
           <ChevronRight size={16} color="#A8969F" strokeWidth={1.5} />

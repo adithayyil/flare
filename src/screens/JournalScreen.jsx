@@ -7,10 +7,12 @@ import {
   Text,
   ScrollView,
   StyleSheet,
+  SafeAreaView,
 } from 'react-native';
 import { useState, useRef, useEffect } from 'react';
 import Animated, { FadeIn, useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 import { Mic } from 'lucide-react-native';
+import InfoTip from '../components/InfoTip';
 import { useJournalFlow } from '../hooks/useJournalFlow';
 import BubbleQuestion from '../components/BubbleQuestion';
 import BubbleReply from '../components/BubbleReply';
@@ -178,14 +180,15 @@ export default function JournalScreen() {
   const showConversation = severity !== null;
 
   return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFF8F6' }}>
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={{ flex: 1, backgroundColor: '#FFF8F6' }}
+      style={{ flex: 1 }}
       keyboardVerticalOffset={90}
     >
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 60, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 30, paddingBottom: 40 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -268,16 +271,16 @@ export default function JournalScreen() {
             <BubbleQuestion>how severe? tap a number.</BubbleQuestion>
 
             {/* Compact horizontal number row */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginBottom: 8 }}>
               {MANKOSKI_SCALE.filter(l => l.value > 0).map((level) => (
                 <TouchableOpacity
                   key={level.value}
                   onPress={() => setSeverity(level.value)}
                   activeOpacity={0.6}
                   style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 16,
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
                     backgroundColor: severityColor(level.value),
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -291,8 +294,24 @@ export default function JournalScreen() {
             </View>
 
             {/* Scale labels */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2, marginBottom: 24 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 2, marginBottom: 24 }}>
               <Text style={{ color: '#A8969F', fontSize: 11 }}>mild</Text>
+              <InfoTip title="severity scale (Mankoski)">
+                <View style={{ gap: 6 }}>
+                  {MANKOSKI_SCALE.filter(l => l.value > 0).map(l => (
+                    <View key={l.value} style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                      <View style={{
+                        width: 24, height: 24, borderRadius: 12,
+                        backgroundColor: severityColor(l.value),
+                        alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <Text style={{ color: '#2D1520', fontSize: 11, fontWeight: '600' }}>{l.value}</Text>
+                      </View>
+                      <Text style={{ color: '#2D1520', fontSize: 13 }}>{l.label}</Text>
+                    </View>
+                  ))}
+                </View>
+              </InfoTip>
               <Text style={{ color: '#A8969F', fontSize: 11 }}>severe</Text>
             </View>
           </Animated.View>
@@ -372,8 +391,8 @@ export default function JournalScreen() {
                   />
                 )}
 
-                <TouchableOpacity onPress={skipFollowUp} style={{ paddingVertical: 8 }}>
-                  <Text style={{ color: '#A8969F', fontSize: 13 }}>skip</Text>
+                <TouchableOpacity onPress={skipFollowUp} style={{ paddingVertical: 12 }}>
+                  <Text style={{ color: '#A8969F', fontSize: 14, textDecorationLine: 'underline' }}>skip this question</Text>
                 </TouchableOpacity>
               </Animated.View>
             )}
@@ -531,5 +550,6 @@ export default function JournalScreen() {
         </View>
       </BottomSheet>
     </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }

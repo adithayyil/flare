@@ -9,7 +9,7 @@ export default function BottomSheet({ visible, onDismiss, children, title }) {
       animationType="none"
       onRequestClose={onDismiss}
     >
-      <View className="flex-1 justify-end">
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
         {/* Backdrop */}
         <TouchableOpacity
           activeOpacity={1}

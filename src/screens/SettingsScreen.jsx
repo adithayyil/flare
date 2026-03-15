@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { SafeAreaView, ScrollView, View, Text, Alert, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { SafeAreaView, ScrollView, View, Text, Alert, TouchableOpacity, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { ChevronLeft } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { seedData } from '../lib/seedData';
@@ -86,10 +86,17 @@ export default function SettingsScreen() {
               style={{
                 paddingVertical: 14,
                 paddingHorizontal: 16,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                opacity: loading ? 0.5 : 1,
               }}
             >
-              <Text style={{ color: '#2D1520', fontSize: 15 }}>seed test data</Text>
-              <Text style={{ color: '#A8969F', fontSize: 13, marginTop: 2 }}>12 sample entries</Text>
+              <View>
+                <Text style={{ color: '#2D1520', fontSize: 15 }}>seed test data</Text>
+                <Text style={{ color: '#A8969F', fontSize: 13, marginTop: 2 }}>12 sample entries</Text>
+              </View>
+              {loading && <ActivityIndicator size="small" color="#A8969F" />}
             </TouchableOpacity>
 
             <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: '#F0E0E0', marginHorizontal: 16 }} />
@@ -101,10 +108,17 @@ export default function SettingsScreen() {
               style={{
                 paddingVertical: 14,
                 paddingHorizontal: 16,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                opacity: loading ? 0.5 : 1,
               }}
             >
-              <Text style={{ color: '#F08080', fontSize: 15 }}>clear all data</Text>
-              <Text style={{ color: '#A8969F', fontSize: 13, marginTop: 2 }}>delete everything</Text>
+              <View>
+                <Text style={{ color: '#F08080', fontSize: 15 }}>clear all data</Text>
+                <Text style={{ color: '#A8969F', fontSize: 13, marginTop: 2 }}>delete everything</Text>
+              </View>
+              {loading && <ActivityIndicator size="small" color="#A8969F" />}
             </TouchableOpacity>
           </View>
         </View>
