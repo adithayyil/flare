@@ -19,10 +19,9 @@ export default function App() {
         const done = await getOnboardingDone();
         setOnboarded(done);
 
-        let apiKey = await getMoorchehKey();
-        if (!apiKey) {
-          apiKey = Constants.expoConfig?.extra?.moorchehApiKey || process.env.MOORCHEH_API_KEY;
-        }
+        const envKey = Constants.expoConfig?.extra?.moorchehApiKey;
+        const storedKey = await getMoorchehKey();
+        const apiKey = envKey || storedKey;
         if (apiKey && apiKey !== 'your-moorcheh-api-key-here') {
           initMoorcheh(apiKey);
         }

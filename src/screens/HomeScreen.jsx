@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -67,7 +67,7 @@ export default function HomeScreen() {
   const [pattern, setPattern] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [allEntries, periodStarts, periodEnds] = await Promise.all([
         getEntryIndex(),
@@ -83,13 +83,13 @@ export default function HomeScreen() {
     } finally {
       setRefreshing(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [loadData]);
   useEffect(() => {
     const unsub = navigation.addListener('focus', loadData);
     return unsub;
-  }, [navigation]);
+  }, [navigation, loadData]);
 
   const dateGroups = groupByDate(entries).slice(0, 5); // last 5 days max
 
@@ -110,7 +110,10 @@ export default function HomeScreen() {
               <Text style={{ color: '#A8969F', fontSize: 13, marginTop: 2 }}>
                 cycle day {cycleDay}
                 {periodStatus.active && periodStatus.startDate
-                  ? ` · period day ${Math.floor((new Date(new Date().toLocaleDateString('en-CA')) - new Date(periodStatus.startDate)) / (1000 * 60 * 60 * 24)) + 1}`
+                  ? (() => {
+                      const days = Math.floor((new Date(new Date().toLocaleDateString('en-CA')) - new Date(periodStatus.startDate)) / (1000 * 60 * 60 * 24)) + 1;
+                      return Number.isFinite(days) && days > 0 ? ` · period day ${days}` : '';
+                    })()
                   : ''}
               </Text>
             )}

@@ -119,8 +119,8 @@ export async function clearAllData() {
     await AsyncStorage.removeItem("flare_moorcheh_key");
     await AsyncStorage.removeItem("flare_worker_url");
   } else {
-    await SecureStore.deleteItemAsync("flare_moorcheh_key");
-    await SecureStore.deleteItemAsync("flare_worker_url");
+    try { await SecureStore.deleteItemAsync("flare_moorcheh_key"); } catch {}
+    try { await SecureStore.deleteItemAsync("flare_worker_url"); } catch {}
   }
 }
 

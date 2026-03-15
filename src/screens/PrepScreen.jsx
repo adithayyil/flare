@@ -155,7 +155,10 @@ const LOADING_MESSAGES = {
 };
 
 function formatMonth(dateStr) {
-  return new Date(dateStr).toLocaleDateString('en-CA', { month: 'long', year: 'numeric' });
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d)) return '';
+  return d.toLocaleDateString('en-CA', { month: 'long', year: 'numeric' });
 }
 
 function buildShareText(gpBrief, patternResult) {
