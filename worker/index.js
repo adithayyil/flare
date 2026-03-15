@@ -48,7 +48,7 @@ export default {
       // Note: This endpoint uses a simple "test" token
       const apiKey = env.HF_API_KEY || 'test';
       const hfResponse = await fetch(
-        'https://vjioo4r1vyvcozuj.us-east-2.aws.endpoints.huggingface.cloud/v1/chat/completions',
+        'https://qyt7893blb71b5d3.us-east-2.aws.endpoints.huggingface.cloud/v1/chat/completions',
         {
           method: 'POST',
           headers: {
