@@ -3,18 +3,20 @@
  * Populates AsyncStorage local index and optionally uploads to Moorcheh.
  * 3 cycles with realistic endo-pattern entries and structured follow-ups.
  */
-import { appendEntryIndex, addPeriodStart, getEntryIndex } from "./storage";
+import { appendEntryIndex, addPeriodStart, addPeriodEnd, getEntryIndex } from "./storage";
 import { uploadEntry } from "./moorcheh";
 
 const SEED_PERIOD_STARTS = ["2026-01-10", "2026-02-08", "2026-03-09"];
+const SEED_PERIOD_ENDS = ["2026-01-15", "2026-02-13"];
 
 const SEED_ENTRIES = [
-  // ── Cycle 1 (Jan 10) ──
+  // ── Cycle 1 (Jan 10 - Jan 15) ──
   {
     id: "e_seed_01",
     timestamp: "2026-01-10T08:00:00.000Z",
     severity: 7,
     cycleDay: 1,
+    isPeriodDay: true,
     text: "awful cramps started this morning, had to call in sick. heating pad barely helping",
     followUp: {
       question: "how did this affect your plans for today?",
@@ -26,6 +28,7 @@ const SEED_ENTRIES = [
     timestamp: "2026-01-11T14:00:00.000Z",
     severity: 8,
     cycleDay: 2,
+    isPeriodDay: true,
     text: "worse than yesterday. can't get out of bed, nausea and back pain on top of cramps",
     followUp: {
       question: "what did you have to miss or cancel?",
@@ -37,6 +40,7 @@ const SEED_ENTRIES = [
     timestamp: "2026-01-13T10:00:00.000Z",
     severity: 4,
     cycleDay: 4,
+    isPeriodDay: true,
     text: "pain easing up, manageable with ibuprofen. still some lower back ache but i can function",
     followUp: null,
   },
@@ -45,6 +49,7 @@ const SEED_ENTRIES = [
     timestamp: "2026-01-22T18:00:00.000Z",
     severity: 5,
     cycleDay: 13,
+    isPeriodDay: false,
     text: "sharp pelvic pain on the right side, not during my period. feels different from cramps",
     followUp: {
       question: "is this type of mid-cycle pain new for you?",
@@ -52,12 +57,13 @@ const SEED_ENTRIES = [
     },
   },
 
-  // ── Cycle 2 (Feb 8) ──
+  // ── Cycle 2 (Feb 8 - Feb 13) ──
   {
     id: "e_seed_05",
     timestamp: "2026-02-08T09:00:00.000Z",
     severity: 8,
     cycleDay: 1,
+    isPeriodDay: true,
     text: "period started and the cramps are terrible. doubled over, couldn't make it to class",
     followUp: {
       question: "what did you have to miss or cancel?",
@@ -69,6 +75,7 @@ const SEED_ENTRIES = [
     timestamp: "2026-02-09T11:00:00.000Z",
     severity: 7,
     cycleDay: 2,
+    isPeriodDay: true,
     text: "still really bad. heavy bleeding, soaked through in an hour. staying home again",
     followUp: {
       question: "how many days have you missed so far this cycle?",
@@ -80,6 +87,7 @@ const SEED_ENTRIES = [
     timestamp: "2026-02-10T16:00:00.000Z",
     severity: 5,
     cycleDay: 3,
+    isPeriodDay: true,
     text: "getting better but exhausted. went to afternoon class but left early",
     followUp: {
       question: "were you able to get through your plans today?",
@@ -91,6 +99,7 @@ const SEED_ENTRIES = [
     timestamp: "2026-02-21T20:00:00.000Z",
     severity: 6,
     cycleDay: 14,
+    isPeriodDay: false,
     text: "that mid-cycle pain again, same right-sided pelvic pain as last month",
     followUp: {
       question: "did this disrupt anything you had planned?",
@@ -102,6 +111,7 @@ const SEED_ENTRIES = [
     timestamp: "2026-02-25T12:00:00.000Z",
     severity: 3,
     cycleDay: 18,
+    isPeriodDay: false,
     text: "pain during sex last night, a dull deep ache. it's happened a few times now",
     followUp: {
       question: "has this been affecting your comfort or intimacy?",
@@ -109,12 +119,13 @@ const SEED_ENTRIES = [
     },
   },
 
-  // ── Cycle 3 (Mar 9) ──
+  // ── Cycle 3 (Mar 9 - ongoing) ──
   {
     id: "e_seed_10",
     timestamp: "2026-03-09T07:30:00.000Z",
     severity: 9,
     cycleDay: 1,
+    isPeriodDay: true,
     text: "worst period yet. woke up at 5am in pain, threw up from the intensity",
     followUp: {
       question: "what were you unable to do today?",
@@ -126,6 +137,7 @@ const SEED_ENTRIES = [
     timestamp: "2026-03-10T10:00:00.000Z",
     severity: 8,
     cycleDay: 2,
+    isPeriodDay: true,
     text: "still terrible. diarrhea and bloating on top of cramps. third cycle in a row losing days to this",
     followUp: {
       question: "how many days have you missed across recent cycles?",
@@ -137,6 +149,7 @@ const SEED_ENTRIES = [
     timestamp: "2026-03-12T15:00:00.000Z",
     severity: 5,
     cycleDay: 4,
+    isPeriodDay: true,
     text: "easing off finally. back at work but struggling to concentrate, totally wiped out",
     followUp: {
       question: "were you able to get through your day?",
@@ -150,7 +163,8 @@ const SEED_ENTRIES = [
  */
 function buildMoorchehText(entry) {
   const date = new Date(entry.timestamp).toLocaleDateString("en-CA");
-  const cycleDayStr = entry.cycleDay ? ` (cycle day ${entry.cycleDay})` : "";
+  const periodTag = entry.isPeriodDay ? ", period day" : "";
+  const cycleDayStr = entry.cycleDay ? ` (cycle day ${entry.cycleDay}${periodTag})` : "";
   let text = `On ${date}${cycleDayStr}, severity ${entry.severity}/10: ${entry.text}`;
   if (entry.followUp?.question && entry.followUp?.answer) {
     text += ` [Follow-up: ${entry.followUp.question} ${entry.followUp.answer}]`;
@@ -169,9 +183,12 @@ export async function seedData(uploadToMoorcheh = false) {
     return;
   }
 
-  // Seed period starts
+  // Seed period starts and ends
   for (const date of SEED_PERIOD_STARTS) {
     await addPeriodStart(date);
+  }
+  for (const date of SEED_PERIOD_ENDS) {
+    await addPeriodEnd(date);
   }
 
   // Seed entries
@@ -181,6 +198,7 @@ export async function seedData(uploadToMoorcheh = false) {
       timestamp: entry.timestamp,
       severity: entry.severity,
       cycleDay: entry.cycleDay,
+      isPeriodDay: entry.isPeriodDay,
       text: entry.text,
       followUp: entry.followUp,
     });

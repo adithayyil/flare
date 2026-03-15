@@ -6,9 +6,9 @@
  */
 
 import { useState, useCallback } from 'react';
-import { appendEntryIndex, getPeriodStarts } from '../lib/storage';
+import { appendEntryIndex, getPeriodStarts, getPeriodEnds } from '../lib/storage';
 import { uploadEntry, initMoorcheh } from '../lib/moorcheh';
-import { estimateCycleDay } from '../lib/cycles';
+import { estimateCycleDay, isPeriodDay } from '../lib/cycles';
 import { generateFollowUp } from '../agents/followUp';
 import * as Haptics from 'expo-haptics';
 
@@ -80,7 +80,8 @@ export function useJournalFlow() {
   // Build Moorcheh text format
   const buildMoorchehText = useCallback((entry) => {
     const date = new Date(entry.timestamp).toLocaleDateString('en-CA'); // YYYY-MM-DD
-    const cycleDayStr = entry.cycleDay ? ` (cycle day ${entry.cycleDay})` : '';
+    const periodTag = entry.isPeriodDay ? ', period day' : '';
+    const cycleDayStr = entry.cycleDay ? ` (cycle day ${entry.cycleDay}${periodTag})` : '';
     let text = `On ${date}${cycleDayStr}, severity ${entry.severity}/10: ${entry.text}`;
 
     if (entry.followUp?.question && entry.followUp?.answer) {
@@ -97,14 +98,20 @@ export function useJournalFlow() {
     }
 
     const timestamp = new Date().toISOString();
-    const periodStarts = await getPeriodStarts();
+    const [periodStarts, periodEnds] = await Promise.all([
+      getPeriodStarts(),
+      getPeriodEnds(),
+    ]);
     const cycleDay = estimateCycleDay(periodStarts);
+    const todayISO = new Date().toLocaleDateString('en-CA');
+    const onPeriod = isPeriodDay(todayISO, periodStarts, periodEnds);
 
     const entry = {
       id: `e_${Date.now()}`,
       timestamp,
       severity,
       cycleDay,
+      isPeriodDay: onPeriod,
       text: symptomText.trim(),
       followUp:
         followUpQuestion && followUpAnswer.trim()

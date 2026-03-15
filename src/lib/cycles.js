@@ -114,6 +114,101 @@ export function estimateCycleDay(periodStarts) {
 }
 
 /**
+ * Pair each period start with the earliest end that comes after it
+ * (and before the next start).
+ * @param {string[]} periodStarts - ISO date strings sorted
+ * @param {string[]} periodEnds - ISO date strings sorted
+ * @returns {Array<{ start: string, end: string|null }>}
+ */
+function pairStartsAndEnds(periodStarts, periodEnds) {
+  const starts = [...periodStarts].sort();
+  const ends = [...periodEnds].sort();
+  const pairs = [];
+
+  for (let i = 0; i < starts.length; i++) {
+    const start = starts[i];
+    const nextStart = starts[i + 1] || null;
+    let matchedEnd = null;
+
+    for (const end of ends) {
+      if (end >= start && (!nextStart || end < nextStart)) {
+        matchedEnd = end;
+        break;
+      }
+    }
+
+    pairs.push({ start, end: matchedEnd });
+  }
+
+  return pairs;
+}
+
+/**
+ * Is a given date within any period start-end range?
+ * If a start has no matching end, treat period as ongoing.
+ * @param {string} dateStr - ISO date string (YYYY-MM-DD)
+ * @param {string[]} periodStarts
+ * @param {string[]} periodEnds
+ * @returns {boolean}
+ */
+export function isPeriodDay(dateStr, periodStarts, periodEnds) {
+  const pairs = pairStartsAndEnds(periodStarts, periodEnds);
+
+  for (const { start, end } of pairs) {
+    if (dateStr >= start) {
+      if (end) {
+        if (dateStr <= end) return true;
+      } else {
+        // No end — period is ongoing, only match if this is the last pair
+        if (start === pairs[pairs.length - 1].start) return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Current period status: is there an active (unended) period?
+ * @param {string[]} periodStarts
+ * @param {string[]} periodEnds
+ * @returns {{ active: boolean, startDate: string|null }}
+ */
+export function getCurrentPeriodStatus(periodStarts, periodEnds) {
+  if (!periodStarts.length) return { active: false, startDate: null };
+
+  const pairs = pairStartsAndEnds(periodStarts, periodEnds);
+  const last = pairs[pairs.length - 1];
+
+  if (!last.end) {
+    return { active: true, startDate: last.start };
+  }
+
+  return { active: false, startDate: null };
+}
+
+/**
+ * Average period length (days) from matched start/end pairs.
+ * @param {string[]} periodStarts
+ * @param {string[]} periodEnds
+ * @returns {number|null} Average days, or null if no completed periods
+ */
+export function getAveragePeriodLength(periodStarts, periodEnds) {
+  const pairs = pairStartsAndEnds(periodStarts, periodEnds);
+  const completed = pairs.filter((p) => p.end);
+
+  if (!completed.length) return null;
+
+  let totalDays = 0;
+  for (const { start, end } of completed) {
+    const diffMs = new Date(end) - new Date(start);
+    totalDays += Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1; // inclusive
+  }
+
+  return Math.round(totalDays / completed.length);
+}
+
+/**
  * Average cycle length from period start dates.
  * @param {string[]} periodStarts
  * @returns {number | null} Average days between starts, or null if < 2 starts
