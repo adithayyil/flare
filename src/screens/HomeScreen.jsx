@@ -8,9 +8,10 @@ import {
   Text,
   Alert,
   Platform,
+  StyleSheet,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Settings } from 'lucide-react-native';
+import { Settings, ChevronRight } from 'lucide-react-native';
 import { getEntryIndex, getPeriodStarts, getPeriodEnds, addPeriodStart, addPeriodEnd } from '../lib/storage';
 import { groupByCycle, estimateCycleDay, getCurrentPeriodStatus } from '../lib/cycles';
 import { detectPattern } from '../lib/patternAlert';
@@ -169,7 +170,7 @@ export default function HomeScreen() {
     const months = cycleGroups.map(c => c.month);
     const first = months[months.length - 1];
     const last = months[0];
-    return first === last ? first : `${first} -- ${last}`;
+    return first === last ? first : `${first} \u2013 ${last}`;
   }, [cycleGroups]);
 
   return (
@@ -237,9 +238,18 @@ export default function HomeScreen() {
                   }
                 }
               }}
-              style={{ marginTop: 4 }}
+              style={{
+                marginTop: 6,
+                alignSelf: 'flex-start',
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: 12,
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: periodStatus.active ? '#F08080' : '#DCC8C8',
+                backgroundColor: periodStatus.active ? '#FFF1ED' : 'transparent',
+              }}
             >
-              <Text style={{ color: '#A8969F', fontSize: 12 }}>
+              <Text style={{ color: periodStatus.active ? '#F08080' : '#A8969F', fontSize: 12, fontWeight: '500' }}>
                 {periodStatus.active ? 'period ended?' : 'period started?'}
               </Text>
             </TouchableOpacity>
@@ -264,14 +274,19 @@ export default function HomeScreen() {
             paddingHorizontal: 20,
             backgroundColor: '#FFF1ED',
             borderRadius: 16,
+            flexDirection: 'row',
+            alignItems: 'center',
           }}
         >
-          <Text style={{ color: '#2D1520', fontSize: 16 }}>
-            {getGreeting()} -- how are you doing?
-          </Text>
-          <Text style={{ color: '#A8969F', fontSize: 13, marginTop: 5 }}>
-            take a moment to check in
-          </Text>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: '#2D1520', fontSize: 16 }}>
+              {getGreeting()} {'\u2013'} how are you doing?
+            </Text>
+            <Text style={{ color: '#A8969F', fontSize: 13, marginTop: 5 }}>
+              take a moment to check in
+            </Text>
+          </View>
+          <ChevronRight size={16} color="#A8969F" strokeWidth={1.5} />
         </TouchableOpacity>
 
         {/* Cycle dashboard */}
@@ -309,8 +324,16 @@ export default function HomeScreen() {
 
             {/* Pattern detail */}
             {pattern && (
-              <View style={{ paddingHorizontal: PX, marginTop: 16 }}>
-                <Text style={{ color: '#A8969F', fontSize: 12, lineHeight: 18 }}>
+              <View style={{
+                marginHorizontal: PX,
+                marginTop: 16,
+                backgroundColor: '#FFF5F5',
+                borderRadius: 12,
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: '#F0D0D0',
+                padding: 14,
+              }}>
+                <Text style={{ color: '#2D1520', fontSize: 14, lineHeight: 20 }}>
                   {pattern.message}
                 </Text>
               </View>
@@ -329,13 +352,32 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={{ paddingHorizontal: PX, paddingVertical: 40, alignItems: 'center' }}>
-            <Text style={{ color: '#A8969F', fontSize: 14, textAlign: 'center' }}>
-              no entries yet
+          <View style={{
+            marginHorizontal: PX,
+            marginTop: 28,
+            backgroundColor: '#FFF1ED',
+            borderRadius: 16,
+            padding: 24,
+            alignItems: 'center',
+          }}>
+            <Text style={{ color: '#2D1520', fontSize: 16, fontWeight: '600', textAlign: 'center', marginBottom: 6 }}>
+              welcome to flare
             </Text>
-            <Text style={{ color: '#A8969F', fontSize: 13, textAlign: 'center', marginTop: 4 }}>
-              start tracking to see patterns
+            <Text style={{ color: '#A8969F', fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 16 }}>
+              start logging symptoms to uncover patterns across your cycles
             </Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Journal')}
+              activeOpacity={0.8}
+              style={{
+                backgroundColor: '#2D1520',
+                borderRadius: 12,
+                paddingVertical: 12,
+                paddingHorizontal: 24,
+              }}
+            >
+              <Text style={{ color: '#FFF8F6', fontSize: 14, fontWeight: '600' }}>log your first entry</Text>
+            </TouchableOpacity>
           </View>
         )}
       </ScrollView>

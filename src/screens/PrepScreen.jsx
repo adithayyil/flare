@@ -6,7 +6,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Share,
+  Platform,
   StyleSheet,
+  SafeAreaView,
 } from 'react-native';
 import { useAppointmentPrep } from '../hooks/useAppointmentPrep';
 
@@ -18,31 +20,31 @@ export default function PrepScreen() {
 
   if (['retrieving', 'analyzing', 'generating'].includes(status)) {
     return (
-      <View style={s.centered}>
-        <ActivityIndicator color="#C8A882" size="large" />
+      <SafeAreaView style={s.centered}>
+        <ActivityIndicator color="#F08080" size="large" />
         <Text style={s.loadingText}>{LOADING_MESSAGES[status]}</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (status === 'insufficient') {
     return (
-      <View style={s.centered}>
+      <SafeAreaView style={s.centered}>
         <Text style={s.emptyTitle}>Not enough data yet</Text>
         <Text style={s.emptyBody}>Log at least 2 symptom entries to generate your appointment prep.</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (status === 'error') {
     return (
-      <View style={s.centered}>
+      <SafeAreaView style={s.centered}>
         <Text style={s.emptyTitle}>Something went wrong</Text>
         <Text style={s.emptyBody}>{error}</Text>
         <TouchableOpacity style={s.retryBtn} onPress={run}>
           <Text style={s.retryText}>Try again</Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -77,12 +79,29 @@ export default function PrepScreen() {
     : '';
 
   // Share GP brief
-  const handleShare = () => {
+  const handleShare = async () => {
     const text = buildShareText(gpBrief, patternResult);
-    Share.share({ message: text, title: 'GP Brief — Flare Health' });
+    if (Platform.OS === 'web') {
+      if (navigator.share) {
+        try { await navigator.share({ text }); } catch {}
+      } else {
+        await navigator.clipboard.writeText(text);
+        window.alert('Copied to clipboard');
+      }
+    } else {
+      Share.share({ message: text, title: 'GP Brief -- Flare Health' });
+    }
+  };
+
+  // Print GP brief (web only)
+  const handlePrint = () => {
+    const html = buildPrintHtml(gpBrief, patternResult, dateRange, cycleGroups.length);
+    const w = window.open('', '_blank');
+    if (w) { w.document.write(html); w.document.close(); w.print(); }
   };
 
   return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFF8F6' }}>
     <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
 
       {/* ── PATIENT SECTION ── */}
@@ -110,9 +129,20 @@ export default function PrepScreen() {
       {/* ── GP BRIEF SECTION ── */}
       <View style={s.gpBriefHeader}>
         <Text style={s.gpBriefTitle}>GP brief</Text>
-        <TouchableOpacity style={s.shareBtn} onPress={handleShare} activeOpacity={0.7}>
-          <Text style={s.shareBtnText}>Share / Print</Text>
-        </TouchableOpacity>
+        {Platform.OS === 'web' ? (
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity style={s.shareBtn} onPress={handleShare} activeOpacity={0.7}>
+              <Text style={s.shareBtnText}>Share</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.shareBtn} onPress={handlePrint} activeOpacity={0.7}>
+              <Text style={s.shareBtnText}>Print</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity style={s.shareBtn} onPress={handleShare} activeOpacity={0.7}>
+            <Text style={s.shareBtnText}>Share</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={s.gpCard}>
@@ -143,6 +173,7 @@ export default function PrepScreen() {
 
       <View style={{ height: 40 }} />
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -159,6 +190,28 @@ function formatMonth(dateStr) {
   const d = new Date(dateStr);
   if (isNaN(d)) return '';
   return d.toLocaleDateString('en-CA', { month: 'long', year: 'numeric' });
+}
+
+function buildPrintHtml(gpBrief, patternResult, dateRange, cycleCount) {
+  const findings = patternResult.findings
+    ?.map(f => `<li><strong>${f.pattern}</strong>: ${f.description}</li>`)
+    .join('') ?? '';
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>GP Brief - Flare Health</title>
+<style>body{font-family:Georgia,serif;max-width:640px;margin:40px auto;color:#222;line-height:1.6}
+h1{font-size:18px;margin-bottom:4px}h2{font-size:14px;text-transform:uppercase;letter-spacing:0.5px;color:#666;margin-top:24px;margin-bottom:8px}
+p{margin:0 0 8px}ul{margin:0;padding-left:20px}li{margin-bottom:4px}
+.meta{color:#888;font-size:13px;margin-bottom:20px}
+.disclaimer{margin-top:24px;padding:12px;background:#f5f5f5;border-radius:4px;font-size:12px;color:#888}
+</style></head><body>
+<h1>${gpBrief.title || 'Patient-reported symptom summary'}</h1>
+<p class="meta">Logged via Flare Health · ${dateRange}</p>
+<h2>Symptom Pattern (${cycleCount} cycles)</h2>
+<ul>${findings}</ul>
+<h2>Clinical Context</h2>
+<p>${gpBrief.overallPattern || ''}</p>
+${gpBrief.patientRequest ? `<h2>Patient Request</h2><p>${gpBrief.patientRequest}</p>` : ''}
+<div class="disclaimer">This summary is patient-reported and does not constitute a clinical diagnosis. Generated by Flare Health for informational purposes.</div>
+</body></html>`;
 }
 
 function buildShareText(gpBrief, patternResult) {
@@ -181,9 +234,9 @@ function buildShareText(gpBrief, patternResult) {
 // ── Styles ──
 
 const s = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: '#FAF7F7' },
+  scroll: { flex: 1, backgroundColor: '#FFF8F6' },
   content: { paddingHorizontal: 20, paddingTop: 24 },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: '#FAF7F7' },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: '#FFF8F6' },
   loadingText: { marginTop: 16, color: '#A8969F', fontSize: 14 },
   emptyTitle: { fontSize: 16, fontWeight: '600', color: '#2D1520', marginBottom: 8 },
   emptyBody: { fontSize: 14, color: '#A8969F', textAlign: 'center', lineHeight: 20 },
