@@ -48,9 +48,9 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFF8F6' }}>
-      <ScrollView>
+      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
         {/* Header with back */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 16, paddingBottom: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 16, paddingBottom: 4 }}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 8 }} activeOpacity={0.6}>
             <ChevronLeft size={22} color="#2D1520" strokeWidth={1.5} />
           </TouchableOpacity>
@@ -58,45 +58,46 @@ export default function SettingsScreen() {
         </View>
 
         {/* Dev section */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
-          <Text style={{ color: '#A8969F', fontSize: 11, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 12 }}>
+        <View style={{ paddingHorizontal: 20, marginTop: 20 }}>
+          <Text style={{ color: '#A8969F', fontSize: 11, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 16 }}>
             development
           </Text>
 
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={handleSeedData}
-            disabled={loading}
-            style={{
-              paddingVertical: 14,
-              paddingHorizontal: 16,
-              backgroundColor: '#FFFFFF',
-              borderRadius: 12,
-              borderWidth: StyleSheet.hairlineWidth,
-              borderColor: '#F0E0E0',
-              marginBottom: 8,
-            }}
-          >
-            <Text style={{ color: '#2D1520', fontSize: 15 }}>seed test data</Text>
-            <Text style={{ color: '#A8969F', fontSize: 13, marginTop: 2 }}>12 sample entries</Text>
-          </TouchableOpacity>
+          <View style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: 14,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: '#F0E0E0',
+            overflow: 'hidden',
+          }}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleSeedData}
+              disabled={loading}
+              style={{
+                paddingVertical: 14,
+                paddingHorizontal: 16,
+              }}
+            >
+              <Text style={{ color: '#2D1520', fontSize: 15 }}>seed test data</Text>
+              <Text style={{ color: '#A8969F', fontSize: 13, marginTop: 2 }}>12 sample entries</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={handleClearData}
-            disabled={loading}
-            style={{
-              paddingVertical: 14,
-              paddingHorizontal: 16,
-              backgroundColor: '#FFFFFF',
-              borderRadius: 12,
-              borderWidth: StyleSheet.hairlineWidth,
-              borderColor: '#F0E0E0',
-            }}
-          >
-            <Text style={{ color: '#F08080', fontSize: 15 }}>clear all data</Text>
-            <Text style={{ color: '#A8969F', fontSize: 13, marginTop: 2 }}>delete everything</Text>
-          </TouchableOpacity>
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: '#F0E0E0', marginHorizontal: 16 }} />
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleClearData}
+              disabled={loading}
+              style={{
+                paddingVertical: 14,
+                paddingHorizontal: 16,
+              }}
+            >
+              <Text style={{ color: '#F08080', fontSize: 15 }}>clear all data</Text>
+              <Text style={{ color: '#A8969F', fontSize: 13, marginTop: 2 }}>delete everything</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={{ paddingVertical: 40, alignItems: 'center' }}>
