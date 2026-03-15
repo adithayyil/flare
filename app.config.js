@@ -25,6 +25,9 @@ module.exports = {
     web: {
       favicon: './assets/favicon.png',
     },
+    plugins: [
+      "@react-native-community/datetimepicker",
+    ],
     extra: {
       moorchehApiKey: process.env.MOORCHEH_API_KEY,
       workerUrl: process.env.WORKER_URL,
