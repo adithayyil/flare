@@ -44,35 +44,51 @@ export default {
         );
       }
 
-      // Forward to HuggingFace endpoint
-      // Note: This endpoint uses a simple "test" token
+      // Forward to HuggingFace endpoint with fallback
       const apiKey = env.HF_API_KEY || 'test';
-      const hfResponse = await fetch(
+      const endpoints = [
         'https://qyt7893blb71b5d3.us-east-2.aws.endpoints.huggingface.cloud/v1/chat/completions',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            messages,
-            temperature,
-            max_tokens,
-          }),
-        }
-      );
+        'https://vjioo4r1vyvcozuj.us-east-2.aws.endpoints.huggingface.cloud/v1/chat/completions',
+      ];
 
-      if (!hfResponse.ok) {
-        const errorText = await hfResponse.text();
-        console.error('HuggingFace API error:', errorText);
+      let hfResponse;
+      let lastError;
+
+      for (const endpoint of endpoints) {
+        try {
+          hfResponse = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              messages,
+              temperature,
+              max_tokens,
+            }),
+          });
+
+          if (hfResponse.ok) break;
+
+          lastError = await hfResponse.text();
+          console.error(`Endpoint failed (${hfResponse.status}): ${endpoint}`);
+          hfResponse = null;
+        } catch (err) {
+          console.error(`Endpoint unreachable: ${endpoint}`, err.message);
+          lastError = err.message;
+          hfResponse = null;
+        }
+      }
+
+      if (!hfResponse) {
         return new Response(
           JSON.stringify({
             error: 'LLM service error',
-            details: errorText.substring(0, 200)
+            details: (lastError || 'All endpoints failed').substring(0, 200)
           }),
           {
-            status: hfResponse.status,
+            status: 502,
             headers: {
               'Content-Type': 'application/json',
               'Access-Control-Allow-Origin': '*',
