@@ -6,18 +6,56 @@ import {
   RefreshControl,
   TouchableOpacity,
   Text,
-  StyleSheet,
+  Alert,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Settings } from 'lucide-react-native';
-import { getEntryIndex, getPeriodStarts } from '../lib/storage';
+import { getEntryIndex, getPeriodStarts, addPeriodStart } from '../lib/storage';
 import { groupByCycle, estimateCycleDay } from '../lib/cycles';
+
+const PX = 20; // consistent horizontal padding
 
 function severityColor(n) {
   if (n <= 3) return '#FBC4AB';
   if (n <= 6) return '#F4978E';
   if (n <= 9) return '#F08080';
   return '#D45D5D';
+}
+
+/** Group entries by calendar date (YYYY-MM-DD), newest date first. */
+function groupByDate(entries) {
+  const sorted = [...entries].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  const groups = [];
+  let current = null;
+
+  for (const entry of sorted) {
+    const dateKey = new Date(entry.timestamp).toLocaleDateString('en-CA'); // YYYY-MM-DD
+    if (!current || current.dateKey !== dateKey) {
+      current = { dateKey, entries: [] };
+      groups.push(current);
+    }
+    current.entries.push(entry);
+  }
+  return groups;
+}
+
+function formatDateLabel(dateKey) {
+  const d = new Date(dateKey + 'T12:00:00');
+  const now = new Date();
+  const today = now.toLocaleDateString('en-CA');
+  const yesterday = new Date(now - 86400000).toLocaleDateString('en-CA');
+
+  if (dateKey === today) return 'today';
+  if (dateKey === yesterday) return 'yesterday';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'good morning';
+  if (h < 17) return 'good afternoon';
+  return 'good evening';
 }
 
 export default function HomeScreen() {
@@ -33,8 +71,7 @@ export default function HomeScreen() {
         getPeriodStarts(),
       ]);
       setCycleDay(estimateCycleDay(periodStarts));
-      // Sort newest first
-      setEntries([...allEntries].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)));
+      setEntries(allEntries);
     } catch (error) {
       console.error('Error loading home data:', error);
     } finally {
@@ -48,6 +85,8 @@ export default function HomeScreen() {
     return unsub;
   }, [navigation]);
 
+  const dateGroups = groupByDate(entries).slice(0, 5); // last 5 days max
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFF8F6' }}>
       <ScrollView
@@ -55,16 +94,44 @@ export default function HomeScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} tintColor="#2D1520" />
         }
+        contentContainerStyle={{ paddingBottom: 32 }}
       >
         {/* Header */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: PX, paddingTop: 16, paddingBottom: 4 }}>
           <View>
-            <Text style={{ color: '#2D1520', fontSize: 22, fontWeight: '600' }}>flare</Text>
+            <Text style={{ color: '#2D1520', fontSize: 22, fontWeight: '600' }}>❉ flare</Text>
             {cycleDay && (
               <Text style={{ color: '#A8969F', fontSize: 13, marginTop: 2 }}>
-                Cycle day {cycleDay}
+                cycle day {cycleDay}
               </Text>
             )}
+            <TouchableOpacity
+              activeOpacity={0.6}
+              onPress={async () => {
+                const confirmed = Platform.OS === 'web'
+                  ? window.confirm('mark today as a new period start?')
+                  : await new Promise((resolve) =>
+                      Alert.alert(
+                        'period started?',
+                        'mark today as a new period start?',
+                        [
+                          { text: 'cancel', onPress: () => resolve(false), style: 'cancel' },
+                          { text: 'yes', onPress: () => resolve(true) },
+                        ],
+                      ),
+                    );
+                if (confirmed) {
+                  const todayISO = new Date().toLocaleDateString('en-CA');
+                  await addPeriodStart(todayISO);
+                  loadData();
+                }
+              }}
+              style={{ marginTop: 4 }}
+            >
+              <Text style={{ color: '#A8969F', fontSize: 12 }}>
+                period started?
+              </Text>
+            </TouchableOpacity>
           </View>
           <TouchableOpacity
             onPress={() => navigation.navigate('Settings')}
@@ -80,65 +147,84 @@ export default function HomeScreen() {
           activeOpacity={0.7}
           onPress={() => navigation.navigate('Journal')}
           style={{
-            marginHorizontal: 20,
-            marginTop: 16,
-            marginBottom: 24,
-            paddingVertical: 20,
+            marginHorizontal: PX,
+            marginTop: 20,
+            paddingVertical: 22,
             paddingHorizontal: 20,
-            backgroundColor: '#FFFFFF',
+            backgroundColor: '#FFF1ED',
             borderRadius: 16,
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor: '#F0E0E0',
           }}
         >
-          <Text style={{ color: '#2D1520', fontSize: 15 }}>how are you feeling?</Text>
-          <Text style={{ color: '#A8969F', fontSize: 13, marginTop: 4 }}>tap to log</Text>
+          <Text style={{ color: '#2D1520', fontSize: 16 }}>
+            {getGreeting()} — how are you doing?
+          </Text>
+          <Text style={{ color: '#A8969F', fontSize: 13, marginTop: 5 }}>
+            take a moment to check in
+          </Text>
         </TouchableOpacity>
 
-        {/* Entries */}
-        {entries.length > 0 ? (
-          <View style={{ paddingHorizontal: 20 }}>
-            <Text style={{ color: '#A8969F', fontSize: 11, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 12 }}>
+        {/* Recent entries grouped by date */}
+        {dateGroups.length > 0 ? (
+          <View style={{ paddingHorizontal: PX, marginTop: 28 }}>
+            <Text style={{ color: '#A8969F', fontSize: 11, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 16 }}>
               recent
             </Text>
-            {entries.slice(0, 10).map((entry) => (
-              <View
-                key={entry.id}
-                style={{
-                  paddingVertical: 14,
-                  borderTopWidth: StyleSheet.hairlineWidth,
-                  borderColor: '#F0E0E0',
-                  flexDirection: 'row',
-                  alignItems: 'flex-start',
-                }}
-              >
-                {/* Severity dot */}
-                <View
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 4,
-                    backgroundColor: severityColor(entry.severity),
-                    marginTop: 6,
-                    marginRight: 12,
-                  }}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: '#2D1520', fontSize: 14, lineHeight: 20 }} numberOfLines={2}>
-                    {entry.text}
-                  </Text>
-                  <Text style={{ color: '#A8969F', fontSize: 12, marginTop: 4 }}>
-                    {new Date(entry.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    {' · '}
-                    {entry.severity}/10
-                    {entry.followUp?.answer ? ` · ${entry.followUp.answer}` : ''}
-                  </Text>
-                </View>
+
+            {dateGroups.map((group, gi) => (
+              <View key={group.dateKey} style={gi > 0 ? { marginTop: 16 } : undefined}>
+                {/* Date label */}
+                <Text style={{ color: '#A8969F', fontSize: 12, marginBottom: 6 }}>
+                  {formatDateLabel(group.dateKey)}
+                </Text>
+
+                {/* Entries for that day — flat rows */}
+                {group.entries.map((entry) => (
+                  <View
+                    key={entry.id}
+                    style={{
+                      paddingVertical: 10,
+                      flexDirection: 'row',
+                      alignItems: 'flex-start',
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 4,
+                        backgroundColor: severityColor(entry.severity),
+                        marginTop: 5,
+                        marginRight: 10,
+                      }}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: '#2D1520', fontSize: 14, lineHeight: 19 }} numberOfLines={2}>
+                        {entry.text}
+                      </Text>
+                      <Text style={{ color: '#A8969F', fontSize: 12, marginTop: 3 }}>
+                        {entry.severity}/10
+                        {entry.followUp?.answer ? ` · ${entry.followUp.answer}` : ''}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
               </View>
             ))}
+
+            {/* Appointment prep — inline link, not a card */}
+            <TouchableOpacity
+              activeOpacity={0.6}
+              onPress={() => navigation.navigate('Prep')}
+              style={{ marginTop: 24, paddingVertical: 8 }}
+            >
+              <Text style={{ color: '#A8969F', fontSize: 13 }}>
+                seeing your doctor soon?{' '}
+                <Text style={{ color: '#2D1520', fontWeight: '500' }}>prepare what to say</Text>
+              </Text>
+            </TouchableOpacity>
           </View>
         ) : (
-          <View style={{ paddingHorizontal: 20, paddingVertical: 40, alignItems: 'center' }}>
+          <View style={{ paddingHorizontal: PX, paddingVertical: 40, alignItems: 'center' }}>
             <Text style={{ color: '#A8969F', fontSize: 14, textAlign: 'center' }}>
               no entries yet
             </Text>
@@ -147,29 +233,6 @@ export default function HomeScreen() {
             </Text>
           </View>
         )}
-
-        {/* Appointment prep */}
-        {entries.length > 0 && (
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => navigation.navigate('Prep')}
-            style={{
-              marginHorizontal: 20,
-              marginTop: 8,
-              paddingVertical: 16,
-              paddingHorizontal: 20,
-              backgroundColor: '#FFFFFF',
-              borderRadius: 16,
-              borderWidth: StyleSheet.hairlineWidth,
-              borderColor: '#F0E0E0',
-            }}
-          >
-            <Text style={{ color: '#2D1520', fontSize: 15 }}>prepare for appointment</Text>
-            <Text style={{ color: '#A8969F', fontSize: 13, marginTop: 4 }}>generate clinical summary</Text>
-          </TouchableOpacity>
-        )}
-
-        <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
   );
