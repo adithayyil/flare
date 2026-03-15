@@ -137,9 +137,13 @@ compatibility_date = "2026-03-14"
 
 Storage is split into two layers: **AsyncStorage** for lightweight local data (fast reads for UI rendering) and **Moorcheh** for full entry text (semantic retrieval for agents).
 
-### Moorcheh — Entry Memory
+### Moorcheh — Entry Memory + Clinical Guidelines
 
-Namespace: `flare-health-entries`
+Two namespaces:
+- `flare-health-entries` — patient symptom logs
+- `flare-health-guidelines` — SOGC excerpts + clinical criteria (static, one-time upload)
+
+**Namespace: `flare-health-entries`**
 
 Each symptom entry is uploaded as a Moorcheh document. The `text` field is the user's raw description with date/severity context prepended. Moorcheh embeds this text for semantic search — no structured extraction needed. Queries like "missed work" or "pain during sex" find the right entries by meaning.
 
@@ -155,6 +159,19 @@ Each symptom entry is uploaded as a Moorcheh document. The `text` field is the u
 ```
 
 The `text` field is built as: `"On ${date} (cycle day ${cycleDay}), severity ${n}/10: ${rawText}${followUp ? ` [Follow-up — ${followUp.question} ${followUp.response}]` : ''}"`. The user's own words are the core — context is prepended so the embedding captures timing and intensity. Metadata fields (`severity`, `cycleDay`) are flat document fields for potential filtered queries.
+
+**Namespace: `flare-health-guidelines`** (static, one-time upload — not per-user)
+
+Documents to upload at setup time:
+```json
+[
+  { "id": "sogc-constellation-pattern", "text": "SOGC Clinical Practice Guidelines identify the co-occurrence of severe cyclic dysmenorrhea, non-menstrual pelvic pain, and functional disruption across multiple cycles as the primary constellation warranting investigation for underlying pelvic pathology." },
+  { "id": "sogc-dysmenorrhea-criteria", "text": "Dysmenorrhea severe enough to cause functional impairment — missed work, school, or daily activities — is not considered a normal variant by SOGC guidelines. It warrants clinical assessment and investigation into underlying cause." },
+  { "id": "diagnostic-delay-canada", "text": "The average diagnostic delay for pelvic conditions including endometriosis in Canada is 5.4 to 10 years from symptom onset. This delay is well-documented in Canadian literature and is partly attributable to normalization of pelvic pain symptoms by both patients and clinicians." },
+  { "id": "dismissal-evidence-pain-is-normal", "text": "Clinical guidelines do not support reassuring patients that severe, functionally disruptive period pain is normal. SOGC recommends investigation when dysmenorrhea causes impairment of daily activities, regardless of patient age." },
+  { "id": "dismissal-evidence-too-young", "text": "Pelvic conditions including endometriosis can present in adolescents. Age is not a contraindication for investigation. Diagnostic delay beginning in adolescence contributes to the 5-10 year average delay documented in Canada." }
+]
+```
 
 ### AsyncStorage — Local Index + App State
 
@@ -186,6 +203,13 @@ API keys stored via `expo-secure-store` (encrypted), not AsyncStorage.
 
 ### Moorcheh Utility Module (`lib/moorcheh.js`)
 
+Two namespaces:
+- `flare-health-entries` — patient symptom logs (text namespace, auto-embeddings)
+- `flare-health-guidelines` — SOGC guideline excerpts + diagnostic criteria (text namespace, one-time upload)
+
+Agent 2 queries `flare-health-entries` only.
+Agent 3 queries both — patient data for the brief, guidelines for clinical grounding + citations.
+
 ```
 // Moorcheh API key from env: VITE_MOORCHEH_API_KEY
 // COMMENT: In production this key MUST move to a backend proxy — never expose client-side.
@@ -194,10 +218,16 @@ API keys stored via `expo-secure-store` (encrypted), not AsyncStorage.
 //          This module wraps the raw API so the rest of the app never touches Moorcheh directly.
 
 MOORCHEH_BASE = "https://api.moorcheh.ai/v1"
-NAMESPACE = "flare-health-entries"
+PATIENT_NAMESPACE = "flare-health-entries"
+GUIDELINES_NAMESPACE = "flare-health-guidelines"
+
+// NOTE: Verify answer endpoint path against https://docs.moorcheh.ai/api-reference/ai/generate
+// The endpoint may be /ai/generate rather than /answer.
+
+// --- Patient entries ---
 
 uploadEntry(text: string, metadata: object) → Promise<{ uploadId: string }>
-  POST ${MOORCHEH_BASE}/namespaces/${NAMESPACE}/documents
+  POST ${MOORCHEH_BASE}/namespaces/${PATIENT_NAMESPACE}/documents
   Headers: { "x-api-key": VITE_MOORCHEH_API_KEY, "Content-Type": "application/json" }
   Body: { documents: [{ id: `e_${Date.now()}`, text, ...metadata }] }
   Returns: { uploadId } from the 202 response.
@@ -206,15 +236,15 @@ uploadEntry(text: string, metadata: object) → Promise<{ uploadId: string }>
 queryEntries(naturalLanguageQuery: string, topK = 20) → Promise<SearchResult[]>
   POST ${MOORCHEH_BASE}/search
   Headers: { "x-api-key": VITE_MOORCHEH_API_KEY, "Content-Type": "application/json" }
-  Body: { query: naturalLanguageQuery, namespaces: [NAMESPACE], top_k: topK }
+  Body: { query: naturalLanguageQuery, namespaces: [PATIENT_NAMESPACE], top_k: topK }
   Returns: results[] — each { id, score, text, metadata }
 
 answerFromEntries(question: string, headerPrompt?: string) → Promise<string>
-  POST ${MOORCHEH_BASE}/answer
+  POST ${MOORCHEH_BASE}/ai/generate
   Headers: { "x-api-key": VITE_MOORCHEH_API_KEY, "Content-Type": "application/json" }
   Body: {
     query: question,
-    namespace: NAMESPACE,
+    namespace: PATIENT_NAMESPACE,
     top_k: 30,
     temperature: 0.3,
     headerPrompt: headerPrompt || "You are summarizing a patient's symptom log. Be factual and clinical. Do not diagnose.",
@@ -226,6 +256,46 @@ getAllEntries(topK = 100) → Promise<SearchResult[]>
   // Broad semantic query to retrieve all entries. For exhaustive reads (e.g. export).
   // For UI rendering (dot matrix, cycle stats), use the local index in AsyncStorage instead.
   Calls queryEntries("pelvic pain symptom entry log", topK)
+
+// --- Clinical guidelines (one-time upload, not per-user) ---
+
+uploadGuideline(id: string, text: string) → Promise<{ uploadId: string }>
+  POST ${MOORCHEH_BASE}/namespaces/${GUIDELINES_NAMESPACE}/documents
+  Headers: { "x-api-key": VITE_MOORCHEH_API_KEY, "Content-Type": "application/json" }
+  Body: { documents: [{ id, text }] }
+  One-time setup. Upload SOGC excerpts, constellation pattern criteria,
+  diagnostic delay stats, and dismissal response evidence.
+  Suggested document IDs:
+    "sogc-constellation-pattern"
+    "sogc-dysmenorrhea-criteria"
+    "diagnostic-delay-canada"
+    "dismissal-evidence-pain-is-normal"
+    "dismissal-evidence-too-young"
+
+queryGuidelines(clinicalQuery: string, topK = 5) → Promise<SearchResult[]>
+  POST ${MOORCHEH_BASE}/search
+  Headers: { "x-api-key": VITE_MOORCHEH_API_KEY, "Content-Type": "application/json" }
+  Body: { query: clinicalQuery, namespaces: [GUIDELINES_NAMESPACE], top_k: topK }
+  Returns: results[] with similarity scores — each { id, score, text }
+  Used by Agent 3 to retrieve relevant guideline citations.
+
+answerWithClinicalContext(question: string) → Promise<string>
+  // Queries BOTH namespaces. Agent 3 uses this instead of answerFromEntries.
+  // Merges patient entries + clinical guidelines into a single RAG context.
+  POST ${MOORCHEH_BASE}/ai/generate
+  Headers: { "x-api-key": VITE_MOORCHEH_API_KEY, "Content-Type": "application/json" }
+  Body: {
+    query: question,
+    namespaces: [PATIENT_NAMESPACE, GUIDELINES_NAMESPACE],
+    top_k: 30,
+    temperature: 0.3,
+    headerPrompt: "You are a clinical assistant combining patient-reported symptom data with
+      Canadian clinical guidelines. When referencing clinical criteria, cite the guideline by
+      name (e.g. 'SOGC Clinical Practice Guidelines'). Be factual. Do not diagnose.",
+    footerPrompt: "Include dates, severity scores, functional impact, and relevant guideline
+      citations where applicable."
+  }
+  Returns: answer string grounding patient data in clinical evidence.
 ```
 
 ### Local Storage Helpers (`lib/storage.js`)
@@ -460,6 +530,9 @@ GP BRIEF RULES:
 - Clinical language: "patient reports", "severity rated X/10", "functional impairment noted."
 - Keep to one page worth of content.
 - Concise cycle summaries, not verbose.
+- When referencing clinical criteria (e.g. constellation pattern, diagnostic delay), cite by
+  name: "per SOGC Clinical Practice Guidelines" or "consistent with SOGC-documented patterns."
+  Do not fabricate citations — only cite if the guideline text was provided in your context.
 
 Return ONLY the JSON object. No explanation. No markdown.
 ```
@@ -559,11 +632,11 @@ On invocation:
 
   6. State → 'generating'
      Two parallel operations:
-     a. moorcheh.answerFromEntries(
-          "Summarize all logged symptoms across cycles. Include dates, severity scores, symptom types, and functional impact for each entry. Group by menstrual cycle.",
-          "You are summarizing a patient's pelvic pain symptom log for a GP appointment. Be factual, use clinical language, include all dates and severity scores. Do not diagnose."
+     a. moorcheh.answerWithClinicalContext(
+          "Summarize all logged symptoms across cycles. Include dates, severity scores, symptom types, and functional impact for each entry. Group by menstrual cycle. Where relevant, reference Canadian clinical guidelines."
         )
-        → Returns a pre-assembled RAG summary string.
+        → Queries both PATIENT_NAMESPACE and GUIDELINES_NAMESPACE.
+        → Returns a RAG summary grounded in patient data + SOGC guideline citations.
      b. (waits for Agent 2 to finish if not already done)
 
      Then call Agent 3 (GP brief) with:
@@ -602,7 +675,11 @@ On invocation:
 5. `lib/severity.js` — color/label mapping
 6. `App.jsx` + `TabNavigator.jsx` — bottom tab shell (3 tabs)
 7. Empty screen placeholders for Home, Journal, Prep, Settings
-8. Create the `flare-health-entries` namespace in Moorcheh (one-time setup via dashboard or API)
+8. Create two Moorcheh namespaces (one-time setup via dashboard or API):
+   - `flare-health-entries` (text namespace — patient logs)
+   - `flare-health-guidelines` (text namespace — clinical guidelines)
+   Upload the 5 guideline documents defined in the Data Model section to `flare-health-guidelines`.
+   Verify answer endpoint path: https://docs.moorcheh.ai/api-reference/ai/generate
 9. Seed test data: helper to upload 2-3 cycles of entries to Moorcheh + populate local index
 10. `.env` with `VITE_MOORCHEH_API_KEY` — add `.env` to `.gitignore`
 
