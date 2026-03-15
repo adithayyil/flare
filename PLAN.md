@@ -169,7 +169,10 @@ Documents to upload at setup time:
   { "id": "sogc-dysmenorrhea-criteria", "text": "Dysmenorrhea severe enough to cause functional impairment — missed work, school, or daily activities — is not considered a normal variant by SOGC guidelines. It warrants clinical assessment and investigation into underlying cause." },
   { "id": "diagnostic-delay-canada", "text": "The average diagnostic delay for pelvic conditions including endometriosis in Canada is 5.4 to 10 years from symptom onset. This delay is well-documented in Canadian literature and is partly attributable to normalization of pelvic pain symptoms by both patients and clinicians." },
   { "id": "dismissal-evidence-pain-is-normal", "text": "Clinical guidelines do not support reassuring patients that severe, functionally disruptive period pain is normal. SOGC recommends investigation when dysmenorrhea causes impairment of daily activities, regardless of patient age." },
-  { "id": "dismissal-evidence-too-young", "text": "Pelvic conditions including endometriosis can present in adolescents. Age is not a contraindication for investigation. Diagnostic delay beginning in adolescence contributes to the 5-10 year average delay documented in Canada." }
+  { "id": "dismissal-evidence-too-young", "text": "Pelvic conditions including endometriosis can present in adolescents. Age is not a contraindication for investigation. ACOG CPG No. 11 (2026) explicitly includes adolescents in its recommendations. Diagnostic delay beginning in adolescence contributes to the 4-11 year average delay documented by ACOG (2026) and SOGC." },
+  { "id": "acog-2026-diagnosis-standard", "text": "ACOG Clinical Practice Guideline No. 11 (March 2026) establishes that a clinical diagnosis from symptoms alone is sufficient to begin treatment for endometriosis. Laparoscopy is not required before initiating care. Negative imaging (ultrasound, MRI) does not rule out endometriosis and should not be used to dismiss patient-reported symptoms. These recommendations apply to patients of all ages including adolescents." },
+  { "id": "acog-2026-diagnostic-delay", "text": "ACOG Clinical Practice Guideline No. 11 (2026) names a 4-11 year average diagnostic delay for endometriosis and explicitly identifies clinician dismissal and misattribution of symptoms as documented drivers of that delay. Patients who present with documented longitudinal symptom tracking are engaging in exactly the kind of evidence gathering the guideline recommends to accelerate diagnosis." },
+  { "id": "acog-2026-negative-imaging", "text": "Per ACOG CPG No. 11 (2026): negative pelvic ultrasound or MRI results do not rule out endometriosis. The guideline explicitly states that treatment and investigation should proceed based on symptom presentation regardless of imaging findings. This directly addresses the common clinical response of dismissing symptoms because tests appear normal." }
 ]
 ```
 
@@ -518,20 +521,31 @@ Use these to generate:
 
 {"gpBrief":{"title":"Patient-Reported Pelvic Pain Symptom Log","patientNote":"This log was generated from [X] entries tracked over [Y] menstrual cycles using a structured symptom journal. All data is patient-reported.","cycleSummaries":[{"cycleLabel":"Cycle starting [date]","entries":[{"date":"YYYY-MM-DD","cycleDay":"number or unknown","severity":"N/10","symptoms":"comma-separated","functionalImpact":"description or none reported"}],"cycleSummary":"One sentence summarizing this cycle"}],"overallPattern":"2-3 sentences on cross-cycle patterns. Clinical language appropriate for a GP. Do not diagnose.","patientRequest":"Based on these patterns, I would like to discuss whether further investigation is appropriate, including [relevant next steps based on symptoms]. I understand diagnosis requires clinical assessment and I am sharing this log to support that process."},"advocateScripts":[{"dismissalType":"short label","scenario":"one sentence on when GP might say this","script":"2-4 sentence response referencing specific data. Firm but respectful. Partnership framing."}]}
 
+CLINICAL REFERENCE (use to ground advocate scripts — do not reproduce verbatim):
+
+SOGC (Society of Obstetricians and Gynaecologists of Canada): Functional dysmenorrhea warrants investigation. The constellation pattern (dysmenorrhea + non-menstrual pain + functional disruption) across 2+ cycles is flagged for further investigation. Primary authority for Canadian GPs.
+
+ACOG Clinical Practice Guideline No. 11 (March 2026):
+- Clinical diagnosis from symptoms alone is sufficient. Laparoscopy is not required first.
+- Negative imaging does NOT rule out endometriosis. Normal tests do not invalidate symptoms.
+- Recommendations explicitly apply to adolescents.
+- Dismissal and misattribution of symptoms are named as documented drivers of the 4-11 year diagnostic delay.
+- The 4-11 year average delay is ACOG-endorsed (same figure as SOGC literature).
+
 ADVOCATE SCRIPTS — generate 2-3 from this list, choosing the most relevant to this patient's data:
 
-1. "Period pain is normal" → for high-severity dysmenorrhea + functional impact. Script references specific severity scores and days missed.
-2. "Try painkillers / birth control first" → for multi-cycle patterns. Script: willing to discuss treatment while requesting investigation into the cause.
-3. "You're too young" → common dismissal. Script references diagnostic delays for pelvic conditions, notes documented tracking.
-4. "It's probably stress" → for consistent cyclical patterns. Script points to cycle-day correlation (not stress correlation).
-5. "Let's wait and see" → for 2+ cycles documented. Script notes patient HAS been tracking, provides duration and entry count.
+1. "Period pain is normal" → ACOG CPG No. 11 (2026) and SOGC both state that functionally disruptive dysmenorrhea warrants investigation, not reassurance. Script references the patient's specific severity scores and days missed.
+2. "Try painkillers / birth control first" → Script: patient is open to symptom management AND requesting concurrent investigation into cause. Treatment does not preclude diagnosis.
+3. "You're too young" → ACOG CPG No. 11 explicitly includes adolescents. Script references the 4-11 year diagnostic delay (ACOG 2026) and the patient's documented tracking history.
+4. "Your tests came back fine" → ACOG CPG No. 11 explicitly states negative imaging does not rule out endometriosis. Script: normal ultrasound results do not contradict the documented symptom pattern.
+5. "It's probably stress" → Symptoms correlate with specific cycle days, not stress events. Script points to cycle-day timing in the log.
+6. "Let's wait and see" → Patient HAS been tracking — for [X] months across [Y] cycles. Script references entry count and first log date. ACOG names delay as a documented clinical harm.
 
 GP BRIEF RULES:
 - Clinical language: "patient reports", "severity rated X/10", "functional impairment noted."
 - Keep to one page worth of content.
 - Concise cycle summaries, not verbose.
-- When referencing clinical criteria (e.g. constellation pattern, diagnostic delay), cite by
-  name: "per SOGC Clinical Practice Guidelines" or "consistent with SOGC-documented patterns."
+- When referencing clinical criteria, cite both: "per ACOG Clinical Practice Guideline No. 11 (2026) and SOGC Clinical Practice Guidelines."
   Do not fabricate citations — only cite if the guideline text was provided in your context.
 
 Return ONLY the JSON object. No explanation. No markdown.

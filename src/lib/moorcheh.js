@@ -6,7 +6,11 @@
 // The boilerplate provides the namespace setup and API key configuration.
 
 const MOORCHEH_BASE = "https://api.moorcheh.ai/v1";
-const NAMESPACE = "flare-health-entries";
+const PATIENT_NAMESPACE = "flare-health-entries";
+const GUIDELINES_NAMESPACE = "flare-health-guidelines";
+
+// Legacy alias — keep for any code still referencing NAMESPACE
+const NAMESPACE = PATIENT_NAMESPACE;
 
 function getApiKey() {
   // For hackathon: read from a module-level variable set at app startup.
@@ -103,4 +107,36 @@ export async function answerFromEntries(question, headerPrompt) {
  */
 export async function getAllEntries(topK = 100) {
   return queryEntries("pelvic pain symptom entry log", topK);
+}
+
+/**
+ * RAG answer querying BOTH patient entries and clinical guidelines namespaces.
+ * Used by Agent 3 (via prepAnalysis) to ground the GP brief in patient data + evidence.
+ * @param {string} question
+ * @returns {string} Generated answer with clinical grounding
+ */
+/**
+ * Retrieve context from both patient entries and clinical guidelines namespaces.
+ * /answer only supports one namespace, but /search supports multiple.
+ * We retrieve chunks from both and return a combined context string for the LLM.
+ */
+export async function answerWithClinicalContext(question) {
+  const result = await moorchehFetch("/search", {
+    query: question,
+    namespaces: [PATIENT_NAMESPACE, GUIDELINES_NAMESPACE],
+    top_k: 30,
+  });
+
+  const chunks = (result.results || []).map((r) => r.text).join('\n\n');
+  return chunks;
+}
+
+/**
+ * One-time upload of clinical guideline documents to the guidelines namespace.
+ * Run once at setup — not called during normal app usage.
+ */
+export async function uploadGuideline(id, text) {
+  return moorchehFetch(`/namespaces/${GUIDELINES_NAMESPACE}/documents`, {
+    documents: [{ id, text }],
+  });
 }

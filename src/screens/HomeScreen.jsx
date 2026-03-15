@@ -13,6 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Settings } from 'lucide-react-native';
 import { getEntryIndex, getPeriodStarts, addPeriodStart } from '../lib/storage';
 import { groupByCycle, estimateCycleDay } from '../lib/cycles';
+import { detectPattern } from '../lib/patternAlert';
 
 const PX = 20; // consistent horizontal padding
 
@@ -62,6 +63,7 @@ export default function HomeScreen() {
   const navigation = useNavigation();
   const [cycleDay, setCycleDay] = useState(null);
   const [entries, setEntries] = useState([]);
+  const [pattern, setPattern] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = async () => {
@@ -72,6 +74,7 @@ export default function HomeScreen() {
       ]);
       setCycleDay(estimateCycleDay(periodStarts));
       setEntries(allEntries);
+      setPattern(detectPattern(allEntries, periodStarts));
     } catch (error) {
       console.error('Error loading home data:', error);
     } finally {
@@ -162,6 +165,36 @@ export default function HomeScreen() {
             take a moment to check in
           </Text>
         </TouchableOpacity>
+
+        {/* Pattern alert card */}
+        {pattern && (
+          <View style={{
+            marginHorizontal: PX,
+            marginTop: 12,
+            padding: 16,
+            backgroundColor: '#FFF5F5',
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: '#F0D0D0',
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+              <View style={{
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                backgroundColor: '#F08080',
+                borderRadius: 6,
+                marginRight: 8,
+              }}>
+                <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '600', letterSpacing: 0.4 }}>
+                  {pattern.label.toUpperCase()}
+                </Text>
+              </View>
+            </View>
+            <Text style={{ color: '#2D1520', fontSize: 14, lineHeight: 20 }}>
+              {pattern.message}
+            </Text>
+          </View>
+        )}
 
         {/* Recent entries grouped by date */}
         {dateGroups.length > 0 ? (

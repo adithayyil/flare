@@ -31,6 +31,8 @@ export default function JournalScreen() {
     followUpQuestion,
     followUpOptions,
     followUpAnswer,
+    savedEntry,
+    journalAlert,
     setSymptomText,
     setSeverity,
     setFollowUpAnswer,
@@ -62,10 +64,10 @@ export default function JournalScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Prompt */}
-        <BubbleQuestion>what's going on?</BubbleQuestion>
+        {!isSaved && <BubbleQuestion>what's going on?</BubbleQuestion>}
 
         {/* Text input */}
-        <View style={{
+        {!isSaved && <View style={{
           backgroundColor: '#FFFFFF',
           borderRadius: 14,
           borderWidth: StyleSheet.hairlineWidth,
@@ -90,7 +92,7 @@ export default function JournalScreen() {
               minHeight: 100,
             }}
           />
-        </View>
+        </View>}
 
         {/* Severity scale */}
         {showSeverity && (
@@ -129,7 +131,7 @@ export default function JournalScreen() {
         )}
 
         {/* After severity is picked, show the conversation */}
-        {showConversation && (
+        {showConversation && !isSaved && (
           <Animated.View entering={FadeIn.duration(200)}>
             {/* Severity confirmation */}
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
@@ -210,10 +212,95 @@ export default function JournalScreen() {
           </Animated.View>
         )}
 
-        {/* Saved confirmation */}
-        {isSaved && (
-          <Animated.View entering={FadeIn.duration(200)} style={{ paddingVertical: 32, alignItems: 'center' }}>
-            <Text style={{ color: '#2D1520', fontSize: 15 }}>saved.</Text>
+        {/* Saved — full done screen */}
+        {isSaved && savedEntry && (
+          <Animated.View entering={FadeIn.duration(300)}>
+            {/* Confirmation header */}
+            <View style={{ paddingTop: 12, paddingBottom: 24 }}>
+              <Text style={{ color: '#2D1520', fontSize: 20, fontWeight: '600', marginBottom: 4 }}>
+                logged.
+              </Text>
+              <Text style={{ color: '#A8969F', fontSize: 13 }}>
+                {new Date(savedEntry.timestamp).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                {savedEntry.cycleDay ? ` · cycle day ${savedEntry.cycleDay}` : ''}
+              </Text>
+            </View>
+
+            {/* Entry summary card */}
+            <View style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 14,
+              borderWidth: StyleSheet.hairlineWidth,
+              borderColor: '#F0E0E0',
+              padding: 16,
+              marginBottom: 12,
+            }}>
+              <Text style={{ color: '#2D1520', fontSize: 14, lineHeight: 21, marginBottom: 12 }}>
+                {savedEntry.text}
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: 5,
+                  backgroundColor: severityColor(savedEntry.severity),
+                  marginRight: 8,
+                }} />
+                <Text style={{ color: '#7A6872', fontSize: 13 }}>
+                  {savedEntry.severity}/10 — {MANKOSKI_SCALE.find(l => l.value === savedEntry.severity)?.label}
+                </Text>
+              </View>
+              {savedEntry.followUp?.answer && (
+                <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#F0E0E0' }}>
+                  <Text style={{ color: '#A8969F', fontSize: 12, marginBottom: 4 }}>{savedEntry.followUp.question}</Text>
+                  <Text style={{ color: '#2D1520', fontSize: 13 }}>{savedEntry.followUp.answer}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Pattern alert */}
+            {journalAlert && (
+              <Animated.View entering={FadeIn.duration(400)} style={{
+                backgroundColor: '#FFF5F5',
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: '#F0D0D0',
+                padding: 16,
+                marginBottom: 12,
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                  <View style={{
+                    backgroundColor: '#F08080',
+                    borderRadius: 6,
+                    paddingHorizontal: 8,
+                    paddingVertical: 3,
+                    marginRight: 8,
+                  }}>
+                    <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '600', letterSpacing: 0.4 }}>
+                      PATTERN FLAGGED
+                    </Text>
+                  </View>
+                </View>
+                <Text style={{ color: '#2D1520', fontSize: 14, lineHeight: 21 }}>
+                  {journalAlert}
+                </Text>
+              </Animated.View>
+            )}
+
+            {/* Done button */}
+            <TouchableOpacity
+              onPress={reset}
+              activeOpacity={0.8}
+              style={{
+                marginTop: 8,
+                paddingVertical: 16,
+                alignItems: 'center',
+                backgroundColor: '#2D1520',
+                borderRadius: 14,
+              }}
+            >
+              <Text style={{ color: '#FFF8F6', fontSize: 15, fontWeight: '600' }}>done</Text>
+            </TouchableOpacity>
           </Animated.View>
         )}
       </ScrollView>

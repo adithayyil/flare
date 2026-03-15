@@ -6,10 +6,11 @@
  */
 
 import { useState, useCallback } from 'react';
-import { appendEntryIndex, getPeriodStarts } from '../lib/storage';
+import { appendEntryIndex, getEntryIndex, getPeriodStarts } from '../lib/storage';
 import { uploadEntry, initMoorcheh } from '../lib/moorcheh';
 import { estimateCycleDay } from '../lib/cycles';
 import { generateFollowUp } from '../agents/followUp';
+import { detectJournalAlert } from '../lib/patternAlert';
 import * as Haptics from 'expo-haptics';
 
 const STATES = {
@@ -29,6 +30,7 @@ export function useJournalFlow() {
   const [followUpOptions, setFollowUpOptions] = useState(null);
   const [followUpAnswer, setFollowUpAnswer] = useState('');
   const [savedEntry, setSavedEntry] = useState(null);
+  const [journalAlert, setJournalAlert] = useState(null);
 
   // Set severity and trigger follow-up generation
   const setSeverity = useCallback(
@@ -132,14 +134,17 @@ export function useJournalFlow() {
         }),
       ]);
 
+      // Check for recurring pattern alert
+      const [allEntries, periodStarts] = await Promise.all([
+        getEntryIndex(),
+        getPeriodStarts(),
+      ]);
+      const alert = detectJournalAlert(entry, allEntries, periodStarts);
+      setJournalAlert(alert);
+
       setSavedEntry(entry);
       setState(STATES.SAVED);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-      // Auto-reset to idle after 2 seconds
-      setTimeout(() => {
-        reset();
-      }, 2000);
     } catch (error) {
       console.error('Entry save error:', error);
       // Even if storage fails, reset to allow retry
@@ -156,6 +161,7 @@ export function useJournalFlow() {
     setFollowUpOptions(null);
     setFollowUpAnswer('');
     setSavedEntry(null);
+    setJournalAlert(null);
   }, []);
 
   // Edit from confirm state
@@ -172,6 +178,7 @@ export function useJournalFlow() {
     followUpOptions,
     followUpAnswer,
     savedEntry,
+    journalAlert,
 
     // Actions
     setSymptomText,
