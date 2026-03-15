@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { SafeAreaView, ScrollView, View, Text, Alert, TouchableOpacity, StyleSheet } from 'react-native';
+import { SafeAreaView, ScrollView, View, Text, Alert, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { ChevronLeft } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { seedData } from '../lib/seedData';
@@ -21,29 +21,32 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleClearData = () => {
-    Alert.alert(
-      'Clear all data?',
-      'This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear',
-          style: 'destructive',
-          onPress: async () => {
-            setLoading(true);
-            try {
-              await clearAllData();
-              Alert.alert('Cleared', 'All data deleted');
-            } catch (error) {
-              Alert.alert('Error', error.message);
-            } finally {
-              setLoading(false);
-            }
-          },
-        },
-      ]
-    );
+  const handleClearData = async () => {
+    const confirmed = Platform.OS === 'web'
+      ? window.confirm('Clear all data? This cannot be undone.')
+      : await new Promise((resolve) =>
+          Alert.alert(
+            'Clear all data?',
+            'This cannot be undone.',
+            [
+              { text: 'Cancel', onPress: () => resolve(false), style: 'cancel' },
+              { text: 'Clear', onPress: () => resolve(true), style: 'destructive' },
+            ],
+          ),
+        );
+    if (confirmed) {
+      setLoading(true);
+      try {
+        await clearAllData();
+        if (Platform.OS === 'web') window.alert('All data deleted');
+        else Alert.alert('Cleared', 'All data deleted');
+      } catch (error) {
+        if (Platform.OS === 'web') window.alert(error.message);
+        else Alert.alert('Error', error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
   };
 
   return (

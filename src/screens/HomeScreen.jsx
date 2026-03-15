@@ -11,8 +11,8 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Settings } from 'lucide-react-native';
-import { getEntryIndex, getPeriodStarts, addPeriodStart } from '../lib/storage';
-import { groupByCycle, estimateCycleDay } from '../lib/cycles';
+import { getEntryIndex, getPeriodStarts, getPeriodEnds, addPeriodStart, addPeriodEnd } from '../lib/storage';
+import { groupByCycle, estimateCycleDay, getCurrentPeriodStatus } from '../lib/cycles';
 import { detectPattern } from '../lib/patternAlert';
 
 const PX = 20; // consistent horizontal padding

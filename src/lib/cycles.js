@@ -123,6 +123,7 @@ export function estimateCycleDay(periodStarts) {
 function pairStartsAndEnds(periodStarts, periodEnds) {
   const starts = [...periodStarts].sort();
   const ends = [...periodEnds].sort();
+  const usedEnds = new Set();
   const pairs = [];
 
   for (let i = 0; i < starts.length; i++) {
@@ -131,8 +132,10 @@ function pairStartsAndEnds(periodStarts, periodEnds) {
     let matchedEnd = null;
 
     for (const end of ends) {
-      if (end >= start && (!nextStart || end < nextStart)) {
+      if (usedEnds.has(end)) continue;
+      if (end >= start && (!nextStart || end <= nextStart)) {
         matchedEnd = end;
+        usedEnds.add(end);
         break;
       }
     }

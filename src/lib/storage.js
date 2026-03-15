@@ -40,11 +40,9 @@ export async function getPeriodStarts() {
 
 export async function addPeriodStart(dateStr) {
   const starts = await getPeriodStarts();
-  if (!starts.includes(dateStr)) {
-    starts.push(dateStr);
-    starts.sort();
-    await AsyncStorage.setItem(KEYS.PERIOD_STARTS, JSON.stringify(starts));
-  }
+  starts.push(dateStr);
+  starts.sort();
+  await AsyncStorage.setItem(KEYS.PERIOD_STARTS, JSON.stringify(starts));
 }
 
 export async function getPeriodEnds() {
@@ -59,11 +57,9 @@ export async function getPeriodEnds() {
 
 export async function addPeriodEnd(dateStr) {
   const ends = await getPeriodEnds();
-  if (!ends.includes(dateStr)) {
-    ends.push(dateStr);
-    ends.sort();
-    await AsyncStorage.setItem(KEYS.PERIOD_ENDS, JSON.stringify(ends));
-  }
+  ends.push(dateStr);
+  ends.sort();
+  await AsyncStorage.setItem(KEYS.PERIOD_ENDS, JSON.stringify(ends));
 }
 
 // --- Onboarding ---
@@ -116,7 +112,9 @@ export async function setWorkerUrl(url) {
 // --- Housekeeping ---
 
 export async function clearAllData() {
-  await AsyncStorage.multiRemove(Object.values(KEYS));
+  for (const key of Object.values(KEYS)) {
+    await AsyncStorage.removeItem(key);
+  }
   if (isWeb) {
     await AsyncStorage.removeItem("flare_moorcheh_key");
     await AsyncStorage.removeItem("flare_worker_url");
